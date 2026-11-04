@@ -275,8 +275,8 @@
       name: LEVEL_NAMES[n - 1],
       zone: ZONES[zoneIndex(n)],
       zoneIndex: zoneIndex(n),
-      W: 1600 + (n - 1) * 420,       // the water world scales out as you go deeper
-      H: 1000 + (n - 1) * 260,
+      W: Math.round(1600 * Math.pow(1.1, n - 1)),   // the water world grows 10% per level (v0.8)
+      H: Math.round(1000 * Math.pow(1.1, n - 1)),
       goal: GOALS[n - 1],
       enterSize: n === 1 ? 1 : GOALS[n - 2]
     };
@@ -289,8 +289,8 @@
   }
 
   var CONFIG = {
-    VERSION: '0.7',                     // see CHANGELOG.md
-    VERSION_DATE: '2026-11-03',
+    VERSION: '0.8',                     // see CHANGELOG.md
+    VERSION_DATE: '2026-11-04',
     TIME_LIMIT: 900,                    // hard stop at 15 minutes
     LIVES: 3,
     TENSION: { start: 150, full: 300 }, // harder from 2:30, full by 5:00 (raises the predator share by up to 50%)

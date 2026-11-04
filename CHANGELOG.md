@@ -2,6 +2,15 @@
 
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
+## 0.8 — 2026-11-04 (feedback round 6, from the family's 06:41–06:42 notes)
+- Hit points doubled, for fish and for you.
+- Bite timer: at least one second for you (was 0.6 s). Eating chum or plankton also starts the timer.
+- Your school no longer comes back after its members are eaten. New members come only from a new level, or from feeding chum near the school (up to 12 in all).
+- The school takes on your species when you evolve.
+- The school runs from a predator four times its size, and only attacks fish up to 0.6× its size (was 0.85×), so it is less overpowering.
+- The sea grows 10% per level (was a fixed step).
+- Not yet built: EXP per level doubling, the skill button, and hunting in groups (see convo v0.7 questions).
+
 ## 0.7 — 2026-11-04 (feedback round 5)
 - Growth: each level takes about nine fish meals at most. Each meal gives at least a ninth of the level's size range (the 1/10 slowdown is gone). Plankton and chum keep their rate.
 - Your school (from level 10): a pod of your own species follows you, bites smaller fish, and grows with you. There are 2 at level 10, up to 12 by level 20.
