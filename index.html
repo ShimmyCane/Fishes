@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Fishes">
+  <meta name="theme-color" content="#dff8f1">
+  <title>Fishes</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-mode="title">
+
+  <canvas id="view" aria-label="The sea. Swim with your finger."></canvas>
+
+  <!-- HUD (play only) -->
+  <header id="hud" class="hud">
+    <div class="hud-card">
+      <p id="hud-level" class="hud-level">Level 1</p>
+      <p id="hud-zone" class="hud-zone">Sunny Shallows</p>
+      <div class="size-bar" aria-hidden="true"><span id="size-fill"></span></div>
+      <p id="size-text" class="hud-small">Size 1.0 / 2</p>
+    </div>
+    <div class="hud-card hud-right">
+      <p id="hud-lives" class="hud-lives">❤️❤️❤️</p>
+      <div class="size-bar hp-bar" aria-hidden="true"><span id="hp-fill"></span></div>
+      <p id="hud-time" class="hud-small">0:00 / 15:00</p>
+    </div>
+  </header>
+
+  <p id="lock-pill" class="lock-pill" hidden>⚠️ Locked on! Swim away or get small</p>
+
+  <div id="banner" class="banner" role="status" hidden>
+    <p id="banner-title" class="banner-title"></p>
+    <p id="banner-sub" class="banner-sub"></p>
+  </div>
+
+  <div id="joy" class="joy" hidden aria-label="Joystick">
+    <div id="joy-knob" class="joy-knob"></div>
+  </div>
+
+  <button id="sprint" class="sprint" aria-label="Sprint (hold)">
+    <span class="sprint-icon" aria-hidden="true">💨</span>
+    <span class="sprint-text">Sprint</span>
+    <span class="stam" aria-hidden="true"></span>
+  </button>
+
+  <button id="gear" class="gear" aria-label="Settings and notes">⚙️</button>
+
+  <!-- Title screen -->
+  <section id="title" class="overlay title" hidden>
+    <div class="title-card">
+      <div class="logo" aria-hidden="true">🐟</div>
+      <h1>Fishes</h1>
+      <p class="tag">Start as a baby fish. Eat, grow, and become the largest fish ever.</p>
+      <div class="menu">
+        <button id="btn-play" class="big hero">▶ Play</button>
+        <button id="btn-howto" class="big">📖 How to play</button>
+      </div>
+      <div class="diff" role="group" aria-label="Difficulty">
+        <button class="big diff-btn" data-diff="easy" aria-pressed="false">Easy</button>
+        <button class="big diff-btn" data-diff="medium" aria-pressed="false">Medium</button>
+        <button class="big diff-btn" data-diff="hard" aria-pressed="false">Hard</button>
+      </div>
+      <p id="diff-ratio" class="muted diff-ratio"></p>
+      <button id="infinite-toggle" class="big family-link" aria-pressed="false">Infinite mode: Off</button>
+      <div id="howto" class="howto" hidden>
+        <ul>
+          <li>Hold your finger on the sea to swim toward it. (Arrow keys work on a computer.)</li>
+          <li>Hold 💨 Sprint to dash. It uses stamina and comes back when you stop.</li>
+          <li>Eat plankton and smaller fish. Bigger fish will eat you.</li>
+          <li>A red ring means a hunter has locked on to you. Swim away or grow bigger.</li>
+          <li>Reach size 100 on level 20 to win. You have 3 lives and 15 minutes.</li>
+        </ul>
+      </div>
+      <p id="title-best" class="muted">No best score yet</p>
+      <p id="title-db" class="db-line" data-state="off"></p>
+      <p id="title-version" class="version">Fishes v0.5 · 2026-11-03</p>
+    </div>
+    <p class="foot">Made for iPad. Notes for feedback are under ⚙️.</p>
+  </section>
+
+  <!-- End of run -->
+  <section id="card" class="overlay card-overlay" hidden>
+    <div class="card">
+      <h2 id="card-title"></h2>
+      <p id="card-text"></p>
+      <div class="card-buttons">
+        <button id="card-again" class="big hero">▶ Play again</button>
+        <button id="card-note" class="big">📝 Leave a note</button>
+        <button id="card-title-btn" class="big">🏠 Title</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Settings and notes (⚙️) -->
+  <section id="panel" class="overlay panel" hidden aria-label="Settings">
+    <div class="panel-card">
+      <h2>Settings</h2>
+      <p class="version" id="panel-version">Fishes v0.5 · 2026-11-03</p>
+      <details class="fold">
+        <summary><span>Sound, errors, display and controls</span></summary>
+        <div class="row">
+          <span>Sound</span>
+          <button id="sound-toggle" class="toggle" aria-pressed="true">On</button>
+        </div>
+        <div class="row">
+          <span>Show errors</span>
+          <button id="errors-toggle" class="toggle" aria-pressed="false">Off</button>
+        </div>
+        <div class="row">
+          <span>Health bars</span>
+          <button id="hp-toggle" class="toggle" aria-pressed="true">On</button>
+        </div>
+        <div class="row">
+          <span>Controls</span>
+          <button id="control-toggle" class="toggle" aria-pressed="false">Tap and move</button>
+        </div>
+      </details>
+
+      <details class="fold note-box">
+        <summary><span>Family database</span></summary>
+        <p class="muted">Sign in with the family account (the same one Expansion Wars uses). Notes then go to the family table. The password is not kept on this device.</p>
+        <label for="family-email" class="muted">Email</label>
+        <input id="family-email" class="field" type="email" autocomplete="username" autocapitalize="off">
+        <label for="family-pass" class="muted">Password</label>
+        <input id="family-pass" class="field" type="password" autocomplete="current-password">
+        <button id="family-in" class="big hero">Sign in</button>
+        <button id="family-out" class="big">Sign out</button>
+        <p id="family-status" class="muted" aria-live="polite">Not signed in.</p>
+      </details>
+
+      <details class="fold note-box">
+        <summary><span>Notes for Jimmy</span></summary>
+        <label for="note-text" class="muted">What felt slow, fiddly, unfair or fun? The level and size are saved with it.</label>
+        <textarea id="note-text" rows="3" maxlength="300" placeholder="For example: the sharks lock on too fast on level 9"></textarea>
+        <button id="note-save" class="big">Save note</button>
+        <p id="note-status" class="muted" aria-live="polite"></p>
+        <p id="db-status" class="db-line" data-state="off">Database: checking…</p>
+        <div id="note-list" class="note-list"></div>
+      </details>
+
+      <div class="panel-buttons">
+        <button id="panel-close" class="big hero">▶ Back to the sea</button>
+        <button id="panel-end" class="big">🏁 End game and see my score</button>
+        <button id="panel-title" class="big">🏠 Title</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="errors" class="errors" hidden></div>
+
+  <script src="js/species.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/family.js"></script>
+  <script src="js/notes.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

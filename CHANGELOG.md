@@ -1,0 +1,57 @@
+# Fishes — Changelog
+
+Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
+
+## 0.7 — 2026-11-04 (feedback round 5)
+- Growth: each level takes about nine fish meals at most. Each meal gives at least a ninth of the level's size range (the 1/10 slowdown is gone). Plankton and chum keep their rate.
+- Your school (from level 10): a pod of your own species follows you, bites smaller fish, and grows with you. There are 2 at level 10, up to 12 by level 20.
+- Feeding chum near the pod gives a 50% chance of a new member (up to 12).
+
+## 0.6 — 2026-11-04 (feedback round 4)
+- Level up keeps the fish around you. Background colours fade to the new zone over two seconds. No new species swap in next to you; new species appear far away, gradually.
+- Growth from fish meals is 1/10 as fast from level 2 on. Level 1 keeps its pace, with more plankton to find.
+- Hit points: fish of size 4 or more take 2 to 5 bites. Smaller fish take one or two.
+- Schools defend: a bitten school fish calls its schoolmates, who bite back at the attacker (you included).
+- Predators 2.5× a fish's size make it scatter from further away, and faster.
+- Predators notice chum and gather at it.
+- A larger fish breaks into chum bits (about a quarter of its size) when it dies, instead of vanishing.
+- Plankton and chum bits are eaten on contact again.
+
+## 0.5 — 2026-11-04 (feedback round 3, part 2)
+- Phones: the play view is 2.5× larger, so fish are bigger on iPhone. Pinch and double-tap zoom are turned off on this page.
+- Controls: Tap and move (default) or a joystick at the lower left. Choose in ⚙️ → Sound, errors, display and controls.
+- Sprint is now in the lower-right action column, just above ⚙️.
+- Bite timer: a ring round you fills up as your next bite comes ready.
+- Blood and violence: bites splash red. Once a fish is hurt, other fish go for it first.
+- Swimming looks livelier: stronger tail wiggle and a flapping fin.
+- Fish gain 25% of prey size per meal (was 40%), so levels take longer.
+- Bigger levels: the world grows faster, fish speed up with each tier, and the sea holds more fish.
+- Level up: the old fish stay, and new fish swim in from the edges for about six seconds. They can't touch you until they've settled.
+- ⚙️ End game shows your score and the best score.
+- Infinite mode (title screen): after tier 20 the goal rises 25% each time, with no time cap and no win.
+
+## 0.4 — 2026-11-03 (PR #96, merged)
+- Combat: fish have health. Small fish go in one bite; bigger fish take several bites with a pause between them. Attack is 1 + size/8, health is size/3 (at least 1). You have a health bar too; losing it costs a life. Health regenerates after 4 seconds without a hit.
+- Health bars on fish and on you, hidden from ⚙️ → Sound, errors and display.
+- Danger at a glance: a coral dot over fish that can hurt you, a mint dot over fish you can eat.
+- Chum: a fish of size 4 or more leaves chum when it dies. Chum lasts 25 seconds and draws nearby small fish in to feed, so schools form.
+- A busier sea: small fish and hunters go after plankton and krill when nothing else is happening.
+- Fish eat fish with bites, not instantly.
+- Notes are no longer sent twice when signing in (one send at a time).
+
+## 0.3 — 2026-11-03 (PR #95, merged)
+- Family sign-in is in ⚙️ only; removed from the front page.
+- Settings sections (sound and errors, family database, notes) start collapsed; tap to open.
+- Notes go to the cloud database: each note is kept on the device with an unsent flag, sent when you save while signed in, and sent automatically when you sign in. ⚙️ and the title screen show how many notes are still only on the device.
+
+## 0.2 — 2026-11-03 (PR #90, merged)
+- 20 tiers, now 88 species (3–8 per tier, food included). Each tier mixes docile, wary and aggressive fish.
+- The player evolves into its tier's lead species.
+- Fish eat fish: a non-docile fish ≥1.25× bigger eats a smaller fish it touches.
+- The sea adapts: predators come from 1–3 tiers above the player, prey from 0–3 tiers below.
+- Difficulty on the title screen is the predator:prey ratio: Easy 1:4, Medium 1:2, Hard 1:1.
+- Family database: `fish_notes` applied to the Family project. Family sign-in in ⚙️ → Family database, also reachable from the title screen. Notes save to the cookie first, then to the family table.
+
+## 0.1 — 2026-11-03 (PR #88, merged)
+- First playable MVP: 20 levels, one species per level, lock-on hunters, three lives, 15-minute cap.
+- Notes saved to a cookie. Database SQL written but not applied.
