@@ -408,11 +408,12 @@
   // ---------- combat: health, bites and chum ----------
   // A bite takes off the attacker's attack value. Small fish have 1 health, so one bite is enough;
   // bigger fish take several bites, with a pause between bites (player 0.6 s, fish 0.9 s).
-  var BITE_S = 0.6, STRIKE_S = 0.9;
-  // Fish of size 4 or more take several bites (2 to 5); smaller fish go in one or two.
-  function maxHpOf(size) { return size >= 4 ? Math.max(2, Math.round(size / 2)) : Math.max(1, Math.round(size / 3)); }
+  // The player's bite timer is at least one second (v0.8), and eating chum or plankton also starts it.
+  var BITE_S = 1.0, STRIKE_S = 0.9;
+  // Hit points are doubled (v0.8). Fish of size 4 or more take several bites (4 to 10); smaller fish go in two or more.
+  function maxHpOf(size) { return 2 * (size >= 4 ? Math.max(2, Math.round(size / 2)) : Math.max(1, Math.round(size / 3))); }
   function atkOf(size) { return 1 + Math.floor(size / 8); }
-  function playerMaxHp(size) { return 10 + Math.floor(size / 2); }
+  function playerMaxHp(size) { return 2 * (10 + Math.floor(size / 2)); }
   var CHUM = { id: 'chum', name: 'Chum', kind: 'food', temper: 'docile', shape: 'plankton', size: 0.6, speed: 20, col: '#ffb4a2' };
 
   // A fish of size 4 or more leaves chum behind when it dies. Chum draws small fish in to feed and school.
@@ -431,15 +432,22 @@
   // ---------- your school (from level 10) ----------
   // A pod of your own species follows you, bites smaller fish, and grows with you.
   // Eating chum near the pod has a chance to add a member (up to 12).
+  // The school grows with your level, and it does not come back once its members are eaten (v0.8).
+  // run.podSpawns counts every member ever added (levels and chum), so a dead member is never replaced.
   function podTarget() { return run.info.n >= 10 ? Math.min(12, 2 + (run.info.n - 10)) : 0; }
 
+  // The school takes on your current species when you evolve (v0.8).
   function podSpecies() {
-    if (!run.podSp) run.podSp = Object.assign({}, run.form, { id: run.form.id + '-pod', kind: 'prey', temper: 'docile', school: true });
+    if (!run.podSp || run.podFor !== run.form.id) {
+      run.podFor = run.form.id;
+      run.podSp = Object.assign({}, run.form, { id: run.form.id + '-pod', kind: 'prey', temper: 'docile', school: true });
+    }
     return run.podSp;
   }
 
   function spawnPod() {
     var r = run, a = rand(0, Math.PI * 2);
+    r.podSpawns = (r.podSpawns || 0) + 1;
     r.npcs.push({
       sp: podSpecies(), pod: true, podA: a, x: r.x + Math.cos(a) * 90, y: r.y + Math.sin(a) * 90,
       vx: 0, vy: 0, size: Math.max(0.5, r.size * 0.5), spd: 1, facing: 1, t: rand(0, 6), anchor: { x: r.x, y: r.y },
@@ -451,9 +459,8 @@
   }
 
   function updatePods() {
-    var r = run, want = podTarget(), have = 0;
-    r.npcs.forEach(function (o) { if (o.pod && !o.dead) have++; });
-    for (var i = have; i < want; i++) spawnPod();
+    var r = run, want = podTarget();
+    while ((r.podSpawns || 0) < want) spawnPod();   // only new levels add members; eaten ones stay gone
   }
 
   function updatePodMember(n, dt) {
@@ -462,10 +469,15 @@
     n.biteT = Math.max(0, n.biteT - dt);
     n.size = Math.max(0.5, r.size * 0.5);                      // the pod grows as you grow
     n.hp = Math.min(n.hp, maxHpOf(n.size)); n.maxHp = maxHpOf(n.size);
-    // Attack: the nearest fish this pod can eat, within 220; otherwise keep station beside you.
-    var prey = findNear(n, 220, function (o) { return !o.pod && o.sp.kind !== 'food' && o.sp.kind !== 'harmless' && o.size <= n.size * 0.85; });
+    // Run from a predator four times its size (v0.8), otherwise attack: the nearest fish it can eat within 220
+    // (only fish up to 0.6x its size, so the school is not overpowering); otherwise keep station beside you.
+    var big = findNear(n, 260, function (o) { return !o.pod && canHurt(o.sp) && o.size >= n.size * 4; });
+    var prey = big ? null : findNear(n, 220, function (o) { return !o.pod && o.sp.kind !== 'food' && o.sp.kind !== 'harmless' && o.size <= n.size * 0.6; });
     var tx, ty, s;
-    if (prey) {
+    if (big) {
+      var bd = Math.hypot(big.x - n.x, big.y - n.y) || 1;
+      tx = n.x + (n.x - big.x) / bd * 260; ty = n.y + (n.y - big.y) / bd * 260; s = 260;
+    } else if (prey) {
       tx = prey.x; ty = prey.y; s = 190;
       if (n.biteT <= 0 && Math.hypot(prey.x - n.x, prey.y - n.y) < 40) {
         n.biteT = STRIKE_S;
@@ -851,7 +863,7 @@
     if (n.sp === CHUM) {
       var pod = run.npcs.filter(function (o) { return o.pod && !o.dead && Math.hypot(o.x - n.x, o.y - n.y) < 240; });
       var members = run.npcs.filter(function (o) { return o.pod && !o.dead; }).length;
-      if (pod.length && members < 12 && Math.random() < 0.5) spawnPod();   // fed chum: the group grows
+      if (pod.length && (run.podSpawns || 0) < 12 && Math.random() < 0.5) spawnPod();   // fed chum: the group grows
     }
     checkGrowth();
   }
@@ -892,7 +904,11 @@
       if (n.biteT <= 0) { n.biteT = STRIKE_S; hurt(n, atkOf(n.size)); }
       return;
     }
-    if (sp.kind === 'food' && r.size >= n.size * 1.15) { eatNPC(n); return; }   // plankton and chum bits go in one go
+    if (sp.kind === 'food' && r.size >= n.size * 1.15) {   // plankton and chum bits go in one go; they also start the bite timer
+      r.biteT = Math.max(r.biteT, BITE_S);
+      eatNPC(n);
+      return;
+    }
     if (r.size >= n.size * 1.15 && r.biteT <= 0) {
       r.biteT = BITE_S;
       n.hp -= atkOf(r.size);
@@ -1201,7 +1217,7 @@
       npcs: [], parts: [], spawnT: 0, bannerT: 0, lockedCount: 0, score: 0,
       difficulty: getDifficulty(), form: D.leadOf(1), npcEaten: 0, hitBy: '', infinite: infiniteOn, goal: 2,
       zoneFrom: null, zoneOld: null, bgT: 1,
-      hp: playerMaxHp(1), maxHp: playerMaxHp(1), biteT: 0, quietT: 0
+      hp: playerMaxHp(1), maxHp: playerMaxHp(1), biteT: 0, quietT: 0, podSpawns: 0
     };
     run.x = run.info.W / 2;
     run.y = run.info.H / 2;
