@@ -2,6 +2,13 @@
 
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
+## 0.9 — 2026-11-04 (feedback round 7)
+- Level 20 takes ten fish meals (levels 1–19 keep nine).
+- Endless after level 20: no win and no time cap. The goal keeps rising 25% each step, and the score (shown in the top bar) keeps going up. Infinite mode is always on, so its title-screen toggle is gone.
+- Ally button (above Sprint): one EXP (size) makes an allied fish. Each allied fish after the first costs one more EXP (1, 2, 3, …). Allies are school fish: they bite smaller fish and run from predators four times their size. Allies bought this way do not come back after they are eaten.
+- Hunters come in packs of 2 to 3 (most of the time). When one locks on, its pack-mates lock on too.
+- From level 10, fish have twice the hit points again, so bigger prey takes several bites to bring down.
+
 ## 0.8 — 2026-11-04 (feedback round 6, from the family's 06:41–06:42 notes)
 - Hit points doubled, for fish and for you.
 - Bite timer: at least one second for you (was 0.6 s). Eating chum or plankton also starts the timer.
