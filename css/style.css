@@ -151,6 +151,35 @@ html, body {
 .sprint-text { font-size: 0.95rem; }
 .stam { display: none; }
 
+/* Ally button: above Sprint in the action column (v0.9) */
+.ally {
+  position: fixed;
+  right: 16px;
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 168px);
+  width: 128px;
+  height: 64px;
+  border: var(--line);
+  border-radius: 22px;
+  background: var(--paper);
+  box-shadow: var(--tactile);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  touch-action: none;
+}
+
+.ally:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--ink); }
+.ally-icon { font-size: 1.3rem; line-height: 1; }
+.ally-text { font-size: 0.85rem; }
+body[data-mode="title"] .ally,
+body[data-mode="over"] .ally { display: none; }
+
 .gear {
   position: fixed;
   right: 16px;
@@ -417,7 +446,7 @@ textarea {
 .hp-bar { margin-top: 6px; height: 10px; }
 #hp-fill { background: linear-gradient(90deg, #8fe0b5, #bfeedd) !important; }
 
-/* v0.5: joystick (lower left) and the infinite-mode button */
+/* v0.5: joystick (lower left) */
 .joy {
   position: fixed;
   left: 16px;

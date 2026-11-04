@@ -21,7 +21,6 @@
   var keys = {};
   var control = 'tap';                       // 'tap' (finger/mouse moves you) or 'joystick' (bottom-left stick)
   var joy = { id: null, cx: 0, cy: 0, dx: 0, dy: 0 };
-  var infiniteOn = false;
   var ptr = { down: false, x: 0, y: 0 };
   var sprintHeld = false;
   var bubbles = [];
@@ -33,7 +32,6 @@
   try { best = Number(localStorage.getItem('fish_best')) || 0; } catch (e) { best = 0; }
   try { showErrors = localStorage.getItem('fish_show_errors') === 'on'; } catch (e) { showErrors = false; }
   try { control = localStorage.getItem('fish_control') === 'joystick' ? 'joystick' : 'tap'; } catch (e) { control = 'tap'; }
-  try { infiniteOn = localStorage.getItem('fish_infinite') === 'on'; } catch (e) { infiniteOn = false; }
 
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
   function rand(a, b) { return a + Math.random() * (b - a); }
@@ -411,7 +409,11 @@
   // The player's bite timer is at least one second (v0.8), and eating chum or plankton also starts it.
   var BITE_S = 1.0, STRIKE_S = 0.9;
   // Hit points are doubled (v0.8). Fish of size 4 or more take several bites (4 to 10); smaller fish go in two or more.
-  function maxHpOf(size) { return 2 * (size >= 4 ? Math.max(2, Math.round(size / 2)) : Math.max(1, Math.round(size / 3))); }
+  // From level 10 on, fish have twice the hit points again (v0.9): several bites to take down a prey.
+  function maxHpOf(size) {
+    var late = run && run.info.n >= 10 ? 2 : 1;
+    return late * 2 * (size >= 4 ? Math.max(2, Math.round(size / 2)) : Math.max(1, Math.round(size / 3)));
+  }
   function atkOf(size) { return 1 + Math.floor(size / 8); }
   function playerMaxHp(size) { return 2 * (10 + Math.floor(size / 2)); }
   var CHUM = { id: 'chum', name: 'Chum', kind: 'food', temper: 'docile', shape: 'plankton', size: 0.6, speed: 20, col: '#ffb4a2' };
@@ -427,6 +429,17 @@
         lunge: 0, lx: 0, ly: 0, locked: false, lockT: 0, dead: false, hp: 1, maxHp: 1, biteT: 0, life: 25
       });
     }
+  }
+
+  // A pack hunter that locks on wakes its pack-mates within 500 (v0.9): the pack hunts together.
+  function shareLock(n) {
+    if (n.pack === undefined) return;
+    run.npcs.forEach(function (o) {
+      if (o !== n && o.pack === n.pack && !o.dead && !o.locked && Math.hypot(o.x - n.x, o.y - n.y) < 500) {
+        o.locked = true;
+        o.lockT = n.lockT;
+      }
+    });
   }
 
   // ---------- your school (from level 10) ----------
@@ -445,9 +458,10 @@
     return run.podSp;
   }
 
-  function spawnPod() {
+  // bought: an ally from the ally button (it does not count toward the school's level-based members).
+  function spawnPod(bought) {
     var r = run, a = rand(0, Math.PI * 2);
-    r.podSpawns = (r.podSpawns || 0) + 1;
+    if (!bought) r.podSpawns = (r.podSpawns || 0) + 1;
     r.npcs.push({
       sp: podSpecies(), pod: true, podA: a, x: r.x + Math.cos(a) * 90, y: r.y + Math.sin(a) * 90,
       vx: 0, vy: 0, size: Math.max(0.5, r.size * 0.5), spd: 1, facing: 1, t: rand(0, 6), anchor: { x: r.x, y: r.y },
@@ -461,6 +475,19 @@
   function updatePods() {
     var r = run, want = podTarget();
     while ((r.podSpawns || 0) < want) spawnPod();   // only new levels add members; eaten ones stay gone
+  }
+
+  // Allies (v0.9): one EXP (size) buys an allied fish. Each one after the first costs one more.
+  function allyCost() { return (run.allyBought || 0) + 1; }
+  function buyAlly() {
+    if (!run || mode !== 'play' || paused) return;
+    var cost = allyCost();
+    if (run.size - cost < 1) { floatText(run.x, run.y, 'Need ' + cost + ' EXP'); return; }
+    run.size -= cost;
+    run.allyBought = (run.allyBought || 0) + 1;
+    spawnPod(true);
+    floatText(run.x, run.y, '-' + cost + ' EXP: ally');
+    FishSound.play('eat');
   }
 
   function updatePodMember(n, dt) {
@@ -613,11 +640,26 @@
       if (!sp) { actual = 'edible'; sp = pickSpecies('edible', r.size); }
       if (!sp) break;
       spawnNPC(sp, initial);
-      c.fish++;
-      if (actual === 'threat') c.threat++;
-      else if (actual === 'harmless') c.harmless++;
-      else c.edible++;
-      need--;
+      var lead = r.npcs[r.npcs.length - 1], made = 1;
+      if (sp.kind === 'hunter' && Math.random() < 0.6) {   // hunters often come in packs of 2 to 3 (v0.9)
+        var pk = ++r.packSeq, extra = 1 + Math.floor(Math.random() * 2), pi;
+        lead.pack = pk;
+        for (pi = 0; pi < extra; pi++) {
+          spawnNPC(sp, initial);
+          var mate = r.npcs[r.npcs.length - 1];
+          mate.x = clamp(lead.x + rand(-120, 120), 60, r.info.W - 60);
+          mate.y = clamp(lead.y + rand(-120, 120), 60, r.info.H - 60);
+          mate.anchor = { x: mate.x, y: mate.y };
+          mate.arrive = lead.arrive;
+          mate.pack = pk;
+          made++;
+        }
+      }
+      c.fish += made;
+      if (actual === 'threat') c.threat += made;
+      else if (actual === 'harmless') c.harmless += made;
+      else c.edible += made;
+      need -= made;
       budget--;
     }
   }
@@ -778,6 +820,7 @@
         } else if (sp.temper === 'aggressive' && canEat && n.cool <= 0 && dp < sp.sense && Math.random() < (0.4 + 0.6 * r.tension) * dt) {
           n.locked = true;
           n.lockT = 7 + 2 * r.tension;
+          shareLock(n);
           tx = r.x; ty = r.y; s = sp.speed * (1.1 + 0.3 * r.tension) * n.spd; k = 4;
         } else {
           var chumNear = sp.temper !== 'docile' ? findNear(n, 300, function (o) { return o.sp === CHUM; }) : null;
@@ -831,10 +874,10 @@
   function checkGrowth() {
     while (run && mode === 'play' && run.size >= run.goal) {
       if (run.info.n >= 20) {
-        if (!run.infinite) { endRun('win'); return; }
-        run.goal = run.goal * 1.25;   // infinite mode: the goal rises 25% each time and the sea goes on
+        // Endless (v0.9): no win and no time cap after level 20. The goal keeps rising, and the score goes up.
+        run.goal = run.goal * 1.25;
         FishSound.play('levelup');
-        showBanner('Infinite!', 'Next goal: size ' + run.goal.toFixed(0), 2500);
+        showBanner('Endless', 'Next goal: size ' + run.goal.toFixed(0), 2500);
         continue;
       }
       FishSound.play('levelup');
@@ -852,7 +895,7 @@
     } else {
       // A level takes about nine fish meals at most: each meal gives at least a ninth of the level's size range.
       var span = Math.max(0.5, r.goal - r.info.enterSize);
-      gain = n.sp.kind === 'food' ? n.size * 0.4 : Math.max(n.size * 0.25, span / 9);
+      gain = n.sp.kind === 'food' ? n.size * 0.4 : Math.max(n.size * 0.25, span / (r.info.n >= 20 ? 10 : 9));   // level 20: ten meals (v0.9)
       r.size += gain;
       floatText(n.x, n.y, '+' + gain.toFixed(1));
       FishSound.play('eat');
@@ -919,11 +962,13 @@
   }
 
   // ---------- rules, timing, ending ----------
+  function scoreOf(r) { return r.level * 100 + Math.floor(r.size * 10) + r.eaten * 2; }
+
   function endRun(reason) {
     var r = run;
     if (!r || mode !== 'play') return;
     mode = 'over';
-    var score = r.level * 100 + Math.floor(r.size * 10) + r.eaten * 2 + (reason === 'win' ? 500 : 0);
+    var score = scoreOf(r) + (reason === 'win' ? 500 : 0);
     r.score = score;
     if (score > best) {
       best = score;
@@ -955,7 +1000,7 @@
     r.t += dt;
     r.tension = clamp((r.t - CFG.TENSION.start) / (CFG.TENSION.full - CFG.TENSION.start), 0, 1);
     r.bgT = Math.min(1, (r.bgT || 0) + dt / 2);
-    if (r.t >= CFG.TIME_LIMIT && !r.infinite) { endRun('time'); return; }
+    if (r.t >= CFG.TIME_LIMIT && r.info.n < 20) { endRun('time'); return; }   // endless after level 20: no time cap
 
     updatePlayer(dt);
 
@@ -1144,7 +1189,10 @@
     $('hud-level').textContent = 'Level ' + r.level + ' · ' + r.info.name;
     $('hud-zone').textContent = r.info.zone.name + ' · ' + D.DIFFICULTY[r.difficulty].label;
     $('size-fill').style.width = (pct * 100).toFixed(1) + '%';
-    $('size-text').textContent = 'Size ' + r.size.toFixed(1) + ' / ' + Math.round(r.goal);
+    $('size-text').textContent = r.info.n >= 20
+      ? 'Score ' + scoreOf(r) + ' · Size ' + r.size.toFixed(1)
+      : 'Size ' + r.size.toFixed(1) + ' / ' + Math.round(r.goal);
+    $('ally-cost').textContent = allyCost();
     $('hud-lives').textContent = '❤️'.repeat(r.lives) || '—';
     $('hud-time').textContent = mmss(r.t) + ' / 15:00';
     $('sprint').style.setProperty('--stam', Math.round(r.stamina) + '%');
@@ -1174,11 +1222,6 @@
     $('diff-ratio').textContent = info.label + ': ' + info.ratio + '. It gets harder after 2:30.';
   }
 
-  function refreshInfinite() {
-    $('infinite-toggle').textContent = 'Infinite mode: ' + (infiniteOn ? 'On' : 'Off');
-    $('infinite-toggle').setAttribute('aria-pressed', String(infiniteOn));
-  }
-
   function refreshControl() {
     $('control-toggle').textContent = control === 'joystick' ? 'Joystick' : 'Tap and move';
     $('control-toggle').setAttribute('aria-pressed', String(control === 'joystick'));
@@ -1200,7 +1243,6 @@
     document.body.setAttribute('data-mode', 'title');
     refreshDbStatus();
     refreshDiff();
-    refreshInfinite();
     refreshControl();
   }
 
@@ -1215,7 +1257,7 @@
       x: 0, y: 0, vx: 0, vy: 0, facing: 1,
       stamina: 100, sprintCd: 0, sprinting: false, inv: 2.5,
       npcs: [], parts: [], spawnT: 0, bannerT: 0, lockedCount: 0, score: 0,
-      difficulty: getDifficulty(), form: D.leadOf(1), npcEaten: 0, hitBy: '', infinite: infiniteOn, goal: 2,
+      difficulty: getDifficulty(), form: D.leadOf(1), npcEaten: 0, hitBy: '', goal: 2, packSeq: 0, allyBought: 0,
       zoneFrom: null, zoneOld: null, bgT: 1,
       hp: playerMaxHp(1), maxHp: playerMaxHp(1), biteT: 0, quietT: 0, podSpawns: 0
     };
@@ -1376,11 +1418,7 @@
 
   // Buttons
   $('btn-play').addEventListener('click', startRun);
-  $('infinite-toggle').addEventListener('click', function () {
-    infiniteOn = !infiniteOn;
-    try { localStorage.setItem('fish_infinite', infiniteOn ? 'on' : 'off'); } catch (e) { /* private mode */ }
-    refreshInfinite();
-  });
+  $('ally').addEventListener('click', buyAlly);
   $('control-toggle').addEventListener('click', function () {
     control = control === 'tap' ? 'joystick' : 'tap';
     try { localStorage.setItem('fish_control', control); } catch (e) { /* private mode */ }

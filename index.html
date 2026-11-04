@@ -41,6 +41,11 @@
     <div id="joy-knob" class="joy-knob"></div>
   </div>
 
+  <button id="ally" class="ally" aria-label="Make an allied fish">
+    <span class="ally-icon" aria-hidden="true">🐠</span>
+    <span class="ally-text">Ally −<span id="ally-cost">1</span> EXP</span>
+  </button>
+
   <button id="sprint" class="sprint" aria-label="Sprint (hold)">
     <span class="sprint-icon" aria-hidden="true">💨</span>
     <span class="sprint-text">Sprint</span>
@@ -65,7 +70,6 @@
         <button class="big diff-btn" data-diff="hard" aria-pressed="false">Hard</button>
       </div>
       <p id="diff-ratio" class="muted diff-ratio"></p>
-      <button id="infinite-toggle" class="big family-link" aria-pressed="false">Infinite mode: Off</button>
       <div id="howto" class="howto" hidden>
         <ul>
           <li>Hold your finger on the sea to swim toward it. (Arrow keys work on a computer.)</li>
