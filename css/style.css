@@ -122,15 +122,26 @@ html, body {
 .banner-title { margin: 0; font-size: 1.5rem; font-weight: 900; }
 .banner-sub { margin: 4px 0 0; font-weight: 700; color: var(--muted); }
 
-/* ----- Sprint and ⚙️ (lower corners) ----- */
-.sprint {
+/* ----- Action column (lower right): Ally, Sprint, then ⚙️ at the bottom -----
+   One flex column, so the buttons stack and never overlap. Sizes are in em of
+   .actions, which scales with the screen (clamped), so every button scales together. */
+.actions {
   position: fixed;
-  right: 16px;
-  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 88px);   /* action column, just above ⚙️ */
-  width: 128px;
-  height: 92px;
+  right: 1em;
+  bottom: max(1em, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75em;
+  font-size: clamp(12px, min(2.6vmin, 3.2vh), 22px);   /* also capped by height, so short landscape phones keep clear of the HUD */
+  z-index: 12;
+}
+
+.sprint {
+  width: 8em;
+  height: 5.75em;
   border: var(--line);
-  border-radius: 26px;
+  border-radius: 1.6em;
   background:
     linear-gradient(90deg, var(--sun) var(--stam, 100%), #ffffff var(--stam, 100%));
   box-shadow: var(--tactile);
@@ -147,19 +158,16 @@ html, body {
 }
 
 .sprint:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--ink); }
-.sprint-icon { font-size: 1.6rem; line-height: 1; }
-.sprint-text { font-size: 0.95rem; }
+.sprint-icon { font-size: 1.6em; line-height: 1; }
+.sprint-text { font-size: 0.95em; }
 .stam { display: none; }
 
-/* Ally button: above Sprint in the action column (v0.9) */
+/* Ally button: top of the action column (v0.9) */
 .ally {
-  position: fixed;
-  right: 16px;
-  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 168px);
-  width: 128px;
-  height: 64px;
+  width: 8em;
+  height: 4em;
   border: var(--line);
-  border-radius: 22px;
+  border-radius: 1.4em;
   background: var(--paper);
   box-shadow: var(--tactile);
   color: var(--ink);
@@ -175,25 +183,21 @@ html, body {
 }
 
 .ally:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--ink); }
-.ally-icon { font-size: 1.3rem; line-height: 1; }
-.ally-text { font-size: 0.85rem; }
+.ally-icon { font-size: 1.3em; line-height: 1; }
+.ally-text { font-size: 0.85em; }
 body[data-mode="title"] .ally,
 body[data-mode="over"] .ally { display: none; }
 
 .gear {
-  position: fixed;
-  right: 16px;
-  bottom: max(16px, env(safe-area-inset-bottom));
-  width: 72px;
-  height: 72px;
+  width: 2.5em;     /* 2.5 × the 1.8em icon size = 4.5em of .actions */
+  height: 2.5em;
   border: var(--line);
   border-radius: 50%;
   background: var(--paper);
   box-shadow: var(--tactile);
-  font-size: 2rem;
+  font-size: 1.8em;
   line-height: 1;
   cursor: pointer;
-  z-index: 12;
   display: grid;
   place-items: center;
   padding: 0;
@@ -384,8 +388,6 @@ textarea {
   .hud-card { min-width: 0; padding: 6px 10px; }
   .hud-level { font-size: 0.95rem; }
   .hud-zone { display: none; }
-  .gear { width: 64px; height: 64px; }
-  .sprint { width: 112px; height: 84px; }
   h1 { font-size: 2.4rem; }
   .lock-pill { top: 118px; font-size: 0.9rem; }
 }
