@@ -512,13 +512,17 @@
     // Run from a predator four times its size (v0.8). An ally runs from any fish that could eat it (v0.10).
     // Otherwise attack: the nearest fish it can eat within 220 (only fish up to 0.6x its size, so the school is
     // not overpowering). Otherwise an ally eats the nearest chum or plankton. Otherwise keep station beside you.
+    // Allies stay near you (v0.10): they only hunt or forage within LEASH of you, and an ally past it heads back.
+    var LEASH = 300;
+    var nearYou = function (o) { return Math.hypot(o.x - r.x, o.y - r.y) < LEASH; };
+    var away = n.ally && Math.hypot(n.x - r.x, n.y - r.y) > LEASH;
     var big = findNear(n, 260, function (o) {
       if (o.pod) return false;
       if (n.ally) return o.sp.kind !== 'food' && o.sp.kind !== 'harmless' && o.sp.temper !== 'docile' && o.size >= n.size * 1.25;
       return canHurt(o.sp) && o.size >= n.size * 4;
     });
-    var prey = big ? null : findNear(n, 220, function (o) { return !o.pod && o.sp.kind !== 'food' && o.sp.kind !== 'harmless' && o.size <= n.size * 0.6; });
-    var food = big || prey || !n.ally ? null : findFeed(n);
+    var prey = big || away ? null : findNear(n, 220, function (o) { return !o.pod && o.sp.kind !== 'food' && o.sp.kind !== 'harmless' && o.size <= n.size * 0.6 && (!n.ally || nearYou(o)); });
+    var food = big || prey || away || !n.ally ? null : findFeed(n, nearYou);
     var tx, ty, s;
     if (big) {
       var bd = Math.hypot(big.x - n.x, big.y - n.y) || 1;
@@ -582,9 +586,10 @@
   }
 
   // Food close by: chum first, then plankton and krill.
-  function findFeed(n) {
-    return findNear(n, 260, function (o) { return o.sp === CHUM; }) ||
-      findNear(n, 180, function (o) { return o.sp.kind === 'food'; });
+  function findFeed(n, ok) {
+    var keep = ok || function () { return true; };
+    return findNear(n, 260, function (o) { return o.sp === CHUM && keep(o); }) ||
+      findNear(n, 180, function (o) { return o.sp.kind === 'food' && keep(o); });
   }
 
   // ---------- populations: the sea adapts to your size ----------
