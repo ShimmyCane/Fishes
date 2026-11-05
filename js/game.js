@@ -463,7 +463,7 @@
     var r = run, a = rand(0, Math.PI * 2);
     if (!bought) r.podSpawns = (r.podSpawns || 0) + 1;
     r.npcs.push({
-      sp: podSpecies(), pod: true, podA: a, x: r.x + Math.cos(a) * 90, y: r.y + Math.sin(a) * 90,
+      sp: podSpecies(), pod: true, ally: !!bought, podA: a, x: r.x + Math.cos(a) * 90, y: r.y + Math.sin(a) * 90,
       vx: 0, vy: 0, size: Math.max(0.5, r.size * 0.5), spd: 1, facing: 1, t: rand(0, 6), anchor: { x: r.x, y: r.y },
       tgt: null, tT: 0, cool: 0, lunge: 0, lx: 0, ly: 0, locked: false, lockT: 0, dead: false,
       hp: 0, maxHp: 0, biteT: 0, arrive: 0
@@ -477,17 +477,30 @@
     while ((r.podSpawns || 0) < want) spawnPod();   // only new levels add members; eaten ones stay gone
   }
 
-  // Allies (v0.9): one EXP (size) buys an allied fish. Each one after the first costs one more.
-  function allyCost() { return (run.allyBought || 0) + 1; }
+  // Allies (v0.9): one EXP (size) buys an allied fish. Each living ally adds one to the price,
+  // so when allies die the price falls back with them.
+  function liveAllies() { return run.npcs.filter(function (o) { return o.ally && !o.dead; }).length; }
+  function allyCost() { return liveAllies() + 1; }
   function buyAlly() {
     if (!run || mode !== 'play' || paused) return;
     var cost = allyCost();
     if (run.size - cost < 1) { floatText(run.x, run.y, 'Need ' + cost + ' EXP'); return; }
     run.size -= cost;
-    run.allyBought = (run.allyBought || 0) + 1;
     spawnPod(true);
     floatText(run.x, run.y, '-' + cost + ' EXP: ally');
     FishSound.play('eat');
+  }
+
+  // An ally's meal feeds you: half of what you would get from the same meal (v0.10).
+  // Growth is checked after the NPC update, not here, so a level change cannot happen mid-loop.
+  var ALLY_SHARE = 0.5;
+  function allyCredit(meal) {
+    var r = run, span = Math.max(0.5, r.goal - r.info.enterSize), gain;
+    gain = meal.sp.kind === 'food' ? meal.size * 0.4 : Math.max(meal.size * 0.25, span / (r.info.n >= 20 ? 10 : 9));
+    gain *= ALLY_SHARE;
+    r.size += gain;
+    r.growPending = true;
+    floatText(meal.x, meal.y, '+' + gain.toFixed(1));
   }
 
   function updatePodMember(n, dt) {
@@ -496,10 +509,16 @@
     n.biteT = Math.max(0, n.biteT - dt);
     n.size = Math.max(0.5, r.size * 0.5);                      // the pod grows as you grow
     n.hp = Math.min(n.hp, maxHpOf(n.size)); n.maxHp = maxHpOf(n.size);
-    // Run from a predator four times its size (v0.8), otherwise attack: the nearest fish it can eat within 220
-    // (only fish up to 0.6x its size, so the school is not overpowering); otherwise keep station beside you.
-    var big = findNear(n, 260, function (o) { return !o.pod && canHurt(o.sp) && o.size >= n.size * 4; });
+    // Run from a predator four times its size (v0.8). An ally runs from any fish that could eat it (v0.10).
+    // Otherwise attack: the nearest fish it can eat within 220 (only fish up to 0.6x its size, so the school is
+    // not overpowering). Otherwise an ally eats the nearest chum or plankton. Otherwise keep station beside you.
+    var big = findNear(n, 260, function (o) {
+      if (o.pod) return false;
+      if (n.ally) return o.sp.kind !== 'food' && o.sp.kind !== 'harmless' && o.sp.temper !== 'docile' && o.size >= n.size * 1.25;
+      return canHurt(o.sp) && o.size >= n.size * 4;
+    });
     var prey = big ? null : findNear(n, 220, function (o) { return !o.pod && o.sp.kind !== 'food' && o.sp.kind !== 'harmless' && o.size <= n.size * 0.6; });
+    var food = big || prey || !n.ally ? null : findFeed(n);
     var tx, ty, s;
     if (big) {
       var bd = Math.hypot(big.x - n.x, big.y - n.y) || 1;
@@ -511,7 +530,17 @@
         prey.hp -= atkOf(n.size);
         burst(prey.x, prey.y, '#d9473a', 3);
         schoolDefend(prey, n);
-        if (prey.hp <= 0 && !prey.dead) { prey.dead = true; r.npcEaten++; dropChum(prey); }
+        if (prey.hp <= 0 && !prey.dead) {
+          prey.dead = true; r.npcEaten++; dropChum(prey);
+          if (n.ally) allyCredit(prey);
+        }
+      }
+    } else if (food) {
+      tx = food.x; ty = food.y; s = 170;
+      if (Math.hypot(food.x - n.x, food.y - n.y) < 30 && !food.dead) {
+        food.dead = true;
+        burst(food.x, food.y, food.sp.col || '#ffffff', 4);
+        allyCredit(food);
       }
     } else {
       tx = r.x + Math.cos(n.podA + n.t * 0.5) * 90; ty = r.y + Math.sin(n.podA + n.t * 0.5) * 90; s = 200;
@@ -1015,6 +1044,7 @@
     for (i = 0; i < r.npcs.length; i++) {
       if (!r.npcs[i].dead) updateNPC(r.npcs[i], dt, predators);
     }
+    if (r.growPending) { r.growPending = false; checkGrowth(); }   // ally meals add to your size (v0.10)
 
     // Fish eat fish: a non-docile fish at least 1.25x bigger bites a smaller fish it touches.
     // Each bite takes off its attack value; the meal is gone when its health reaches zero.
@@ -1257,7 +1287,7 @@
       x: 0, y: 0, vx: 0, vy: 0, facing: 1,
       stamina: 100, sprintCd: 0, sprinting: false, inv: 2.5,
       npcs: [], parts: [], spawnT: 0, bannerT: 0, lockedCount: 0, score: 0,
-      difficulty: getDifficulty(), form: D.leadOf(1), npcEaten: 0, hitBy: '', goal: 2, packSeq: 0, allyBought: 0,
+      difficulty: getDifficulty(), form: D.leadOf(1), npcEaten: 0, hitBy: '', goal: 2, packSeq: 0,
       zoneFrom: null, zoneOld: null, bgT: 1,
       hp: playerMaxHp(1), maxHp: playerMaxHp(1), biteT: 0, quietT: 0, podSpawns: 0
     };
