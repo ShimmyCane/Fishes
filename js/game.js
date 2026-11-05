@@ -1492,8 +1492,10 @@
 
   // Joystick (bottom-left, when Controls is set to Joystick in ⚙️).
   var joyEl = $('joy'), knob = $('joy-knob');
+  // Knob travel is a share of the stick's on-screen width (one third), so it scales with the stick.
+  var joyMax = 1;
   function joyMove(ev) {
-    var max = 50, x = ev.clientX - joy.cx, y = ev.clientY - joy.cy, d = Math.hypot(x, y);
+    var max = joyMax, x = ev.clientX - joy.cx, y = ev.clientY - joy.cy, d = Math.hypot(x, y);
     if (d > max) { x = x / d * max; y = y / d * max; }
     joy.dx = x / max; joy.dy = y / max;
     knob.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
@@ -1503,6 +1505,7 @@
     joy.id = ev.pointerId;
     var b = joyEl.getBoundingClientRect();
     joy.cx = b.left + b.width / 2; joy.cy = b.top + b.height / 2;
+    joyMax = b.width / 3;
     try { joyEl.setPointerCapture(ev.pointerId); } catch (e) { /* not supported */ }
     joyMove(ev);
     ev.preventDefault();
