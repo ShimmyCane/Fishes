@@ -1,10 +1,12 @@
 # Fishes — Brief (AI notes)
 
-**Updated:** 2026-11-03
+**Updated:** 2026-11-05
 
 ## Current state
 
-- Plain HTML/CSS/JS canvas game in `03 Projects/Fishes/`. No build step. Not device-tested on iPad.
+- Plain HTML/CSS/JS canvas game at the repo root. No build step. Not device-tested on iPad.
+- **Round 7–8 (v0.9 and main after it):** ally button (cost = living allies + 1; allies bite smaller fish, flee anything that could eat them, forage chum and plankton, stay within 300 px of you, and add half a normal meal's EXP per meal). Joystick and the lower-right action column (Ally, Sprint, ⚙️) scale with the screen in em and vmin, and no longer overlap. Test hooks: `allies`, `allyCost` and `debugKillAllies()` in `FishGame`.
+- **Not in the changelog yet:** the joystick, action-column and ally changes are on `main` and need a `0.10 — unreleased` entry. Ally EXP gain and the 300 px leash are guesses until a device play test.
 - **20 tiers** (one per level, five depth zones), **88 species** (3–8 per tier, food included). Each species has a **temper**: docile (never attacks or locks on), wary (hunts smaller fish, ignores you when smaller, no lock-on), aggressive (hunts smaller fish, locks on to you when smaller).
 - **Evolution:** the player takes its tier's lead species (first listed for the tier). Banner "Evolved into …".
 - **Fish eat fish:** a non-docile fish ≥1.25× bigger eats a smaller fish it touches, and hunters hunt smaller fish nearby.
@@ -43,3 +45,15 @@
 1. Jimmy signs in on the iPad (⚙️ → Family database) and saves a test note. Check it in the family table.
 2. Play one full run per difficulty; time it against 8–15 minutes and note unfair moments in ⚙️.
 3. Tune: prey gain (0.4 of prey size), tier windows (currently 1–3 tiers), fish target (22 + 2×tier), threat cap (70%).
+4. Play-test the allies on an iPad: do they stay near you, is the price clear, is the EXP share fair (`ALLY_SHARE`), is the leash right (`LEASH`)?
+
+## Next milestone (requested 2026-11-05)
+
+The user wants this milestone to push four things. See `.claude/skills/fishes-sea-creatures/SKILL.md` for the plan and principles.
+
+1. **Graphics:** richer fish drawing and the ocean itself (depth light, bubbles, a seabed).
+2. **Differentiated fish:** each species recognisable by silhouette, pattern and motion, not colour alone.
+3. **Other ocean elements:** kelp or seagrass cover, currents, jellyfish, and similar.
+4. **Smarter sea creatures:** a few legible behaviours (flee, school, ambush, follow chum) that come from species data.
+
+Open questions for the user: art direction (two options each), how far to push the frame budget on older iPads, and which element to build first.

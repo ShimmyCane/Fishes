@@ -10,3 +10,17 @@
 - Test a spawn rule by counting what it produced, not by reading it. A "threat" that can't hurt the player (a wary prey fish that is bigger than you) made the ratio read wrong until it was classified by what it can do.
 - The Family database is reached through a sandbox proxy that may block `supabase.co` from the browser. Verify access rules through the Supabase tools (grants, RLS policies) and leave the live sign-in to a device test.
 - Take the species table in the schematic from the data (a short node script), not by hand, so the design doc can't drift from `js/species.js`.
+
+## Working process (added 2026-11-05)
+
+- **Fetch before you branch.** A `git checkout -B main origin/main` with no fetch used a copy weeks stale. Work silently vanished from the local tree, and allies looked broken until the branch was rebased on the real `origin/main`. Start every task with `git fetch origin`, and check `git log -1 origin/main` against the last merged PR.
+- **Each merge changes the game the next PR tests.** Re-run the playtest on the current `main` before reporting a bug. Two false alarms this session came from stale code.
+- **Test rules, not sequences, when the sim is random.** A new ally can die within a second of spawning. Assert "price = living allies + 1" and "a buy charges the price shown", not "the price reads 1, 2, 3, 4".
+- **`em` in a child resolves against the child's own font size.** A button sized `4.5em` with its icon at `1.8em` came out 8× the intended size. Put the scale on a container and size children from it.
+- **Keep scope tests off the game's closure.** `window.FishGame` sits outside the setup closure, so it can't call `liveAllies()`. Compute inline, and keep the formula in one comment that points at the real function.
+- **Level changes and growth checks belong outside tight loops.** `checkGrowth` can call `enterLevel`, which replaces the NPC list. Ally EXP sets a flag, and the main loop runs the check after the NPC update.
+- **GitHub merges need the PR marked ready first.** A draft refuses the merge with a 405. Pin the merge with `expectedHeadSha` so a late push can't slip in.
+- **PRs have shipped without a changelog line.** Add the `CHANGELOG.md` entry in the same PR as the change.
+- **The version label is read from `CFG.VERSION`.** The title and settings show the version from `js/species.js`. The HTML placeholders are overwritten at startup, so don't trust them.
+- **Ask for a device check on anything touch-related.** Headless Chromium proves layout and rules, not iPad feel. Each report should say what was not tested.
+- **Balance numbers are guesses until a timed run.** Name them as guesses (leash 300px, EXP share 50%) and ask for a play test before tuning.

@@ -1590,9 +1590,13 @@
   window.FishGame = {
     resize: resize,
     debugSetSize: function (s) { if (run && mode === 'play') { run.size = s; checkGrowth(); } },
+    // Test hooks (v0.10): kill every living ally, to check the price falls back; read the ally count and price.
+    debugKillAllies: function () { if (run) run.npcs.forEach(function (o) { if (o.ally) o.dead = true; }); },
     state: function () {
       return {
         mode: mode, level: run && run.level, size: run && run.size, npcs: run ? run.npcs.length : 0,
+        allies: run ? run.npcs.filter(function (o) { return o.ally && !o.dead; }).length : 0,
+        allyCost: run ? run.npcs.filter(function (o) { return o.ally && !o.dead; }).length + 1 : null,
         locks: run ? run.lockedCount : 0, lives: run && run.lives,
         npcEaten: run && run.npcEaten, difficulty: run && run.difficulty, form: run && run.form && run.form.id,
         census: run ? census() : null, spread: run ? spread() : null,

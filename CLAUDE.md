@@ -4,7 +4,9 @@ Purpose: a game inside a fish tank that becomes the ocean. Start as a baby fish,
 
 - Design: `schematic.md`
 - Q&A history: `convo/` (never compact; start a new version instead)
-- AI notes: `04 AI/Fishes/` (`brief.md`, `lessons.md`)
+- AI notes: `04 AI/` (`brief.md`, `lessons.md`). Read `lessons.md` before a change.
+- Project skills: `.claude/skills/` (`fishes-change-workflow`, `fishes-playtest`, `fishes-sea-creatures`)
+- Playtest: `node tools/playtest.js` (layout, ally rules, smoke run; runs headless against this folder)
 - Database SQL: `supabase/` (apply by hand after the rolled-back test)
 - Shared conventions: root `CLAUDE.md` (public repo, privacy rules)
 

@@ -2,6 +2,11 @@
 
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
+## 0.10 — unreleased
+- Joystick (lower left, when Controls is set to Joystick): sized to the screen, about 28% of the shorter side, with the knob and its reach scaled to match. Easier to use on iPad.
+- Ally, Sprint and ⚙️ are one column in the lower right. They scale with the screen and no longer overlap.
+- Allies: the price is one more than the number of living allies, so it falls when they die. Allies forage chum and plankton, run from anything that could eat them, and stay within reach of you. Each ally meal adds half the EXP you would get from the same meal.
+
 ## 0.9 — 2026-11-04 (feedback round 7)
 - Level 20 takes ten fish meals (levels 1–19 keep nine).
 - Endless after level 20: no win and no time cap. The goal keeps rising 25% each step, and the score (shown in the top bar) keeps going up. Infinite mode is always on, so its title-screen toggle is gone.
