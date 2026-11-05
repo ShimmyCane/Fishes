@@ -449,10 +449,12 @@ textarea {
 /* v0.5: joystick (lower left) */
 .joy {
   position: fixed;
-  left: 16px;
-  bottom: max(16px, env(safe-area-inset-bottom));
-  width: 150px;
-  height: 150px;
+  left: 1em;
+  bottom: max(1em, env(safe-area-inset-bottom));
+  /* Scales with the screen: about 28% of the shorter side, kept between 7.5em and 14em */
+  width: clamp(7.5em, 28vmin, 14em);
+  aspect-ratio: 1;
+  height: auto;
   border: var(--line);
   border-radius: 50%;
   background: rgba(253, 248, 238, 0.7);
@@ -463,8 +465,10 @@ textarea {
   touch-action: none;
 }
 .joy-knob {
-  width: 64px;
-  height: 64px;
+  /* A share of the base, so it grows and shrinks with it */
+  width: 43%;
+  aspect-ratio: 1;
+  height: auto;
   border: var(--line);
   border-radius: 50%;
   background: var(--sun);
