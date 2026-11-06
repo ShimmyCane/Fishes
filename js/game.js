@@ -486,6 +486,7 @@
     var cost = allyCost();
     if (run.size - cost < 1) { floatText(run.x, run.y, 'Need ' + cost + ' EXP'); return; }
     run.size -= cost;
+    run.allySpent = (run.allySpent || 0) + cost;   // test hook: what buys have charged in total
     spawnPod(true);
     floatText(run.x, run.y, '-' + cost + ' EXP: ally');
     FishSound.play('eat');
@@ -1288,13 +1289,13 @@
     $('title').hidden = true;
     run = {
       level: 1, info: D.levelInfo(1), t: 0, tension: 0,
-      lives: CFG.LIVES, eaten: 0, size: 1,
+      lives: CFG.LIVES, eaten: 0, size: D.START_SIZE,
       x: 0, y: 0, vx: 0, vy: 0, facing: 1,
       stamina: 100, sprintCd: 0, sprinting: false, inv: 2.5,
       npcs: [], parts: [], spawnT: 0, bannerT: 0, lockedCount: 0, score: 0,
       difficulty: getDifficulty(), form: D.leadOf(1), npcEaten: 0, hitBy: '', goal: 2, packSeq: 0,
       zoneFrom: null, zoneOld: null, bgT: 1,
-      hp: playerMaxHp(1), maxHp: playerMaxHp(1), biteT: 0, quietT: 0, podSpawns: 0
+      hp: playerMaxHp(D.START_SIZE), maxHp: playerMaxHp(D.START_SIZE), biteT: 0, quietT: 0, podSpawns: 0
     };
     run.x = run.info.W / 2;
     run.y = run.info.H / 2;
@@ -1595,6 +1596,7 @@
     state: function () {
       return {
         mode: mode, level: run && run.level, size: run && run.size, npcs: run ? run.npcs.length : 0,
+        eaten: run ? run.eaten : 0, allySpent: run ? run.allySpent || 0 : 0,
         allies: run ? run.npcs.filter(function (o) { return o.ally && !o.dead; }).length : 0,
         allyCost: run ? run.npcs.filter(function (o) { return o.ally && !o.dead; }).length + 1 : null,
         locks: run ? run.lockedCount : 0, lives: run && run.lives,
