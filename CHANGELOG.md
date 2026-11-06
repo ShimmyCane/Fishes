@@ -3,6 +3,10 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.10 — unreleased
+- The seabed has hills, and the surface has waves. Both repeat exactly at the edge of the sea, so the left and right sides meet without a seam.
+- Swim up through the surface and you hop out into the sky, higher the bigger you are. You splash back down when you land.
+- A current runs sideways in bands by depth, so neighbouring layers of sea drift in opposite directions. It pushes fish, and you a little.
+- Kelp patches on the seabed: plankton and small fish gather round them. Ambush fish swim a loop round a patch and lunge at what gathers there.
 - The sea has no walls. Swim off the left edge and you come out on the right (and the other way round). Fish keep their places around you when you level up.
 - Mini map in the top left: the whole sea, your position (white), big predators that can hurt you (red), sea anemones (pink) and the part of the sea the screen shows (box).
 - Sea anemones are safe spots, spread around the sea. Hide under one and nothing hunts you there, so you don't have to keep running.

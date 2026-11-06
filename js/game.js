@@ -42,6 +42,30 @@
   function dxW(a, b) { var W = run.info.W, d = a - b; return d - W * Math.round(d / W); }
   function distXY(ax, ay, bx, by) { return Math.hypot(dxW(ax, bx), ay - by); }
   function distW(a, b) { return distXY(a.x, a.y, b.x, b.y); }
+
+  // ---------- seabed, surface, current and kelp (v0.11) ----------
+  // The seabed and the surface are periodic in x (period W): whole numbers of waves per sea, so the right edge meets the left.
+  var GRAV = 1400;   // gravity for a fish that hops out of the water
+  function bedY(x) {
+    var W = run.info.W, H = run.info.H, u = 2 * Math.PI * wrapX(x) / W;
+    return H - 140 + 45 * Math.sin(3 * u + 0.7) + 22 * Math.sin(5 * u + 2.1) + 10 * Math.sin(8 * u);
+  }
+  function surfY(x) {
+    var W = run.info.W, u = 2 * Math.PI * wrapX(x) / W;
+    return 6 * Math.sin(3 * u) + 3 * Math.sin(7 * u + 1);
+  }
+  // Sideways drift by depth: bands flow in opposite directions, so the sea moves in layers.
+  function currentAt(y) { return 40 * Math.sin(2 * Math.PI * y / (run.info.H * 0.6)); }
+  function hopHeight(size) { return clamp(30 + size * 3, 30, 140); }
+  // Kelp patches on the seabed: small fish and plankton gather round them, and ambush fish patrol them.
+  function makeFlora(info) {
+    var count = Math.max(5, Math.round(info.W / 260)), list = [], i;
+    for (i = 0; i < count; i++) {
+      list.push({ x: ((((i + rand(0.2, 0.8)) * info.W / count) % info.W) + info.W) % info.W,
+        h: rand(70, 140), n: 5 + Math.floor(Math.random() * 4), seed: Math.random() * 10 });
+    }
+    return list;
+  }
   function mmss(sec) { sec = Math.floor(sec); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
 
   // Length of a fish on screen (world units). Food is drawn smaller.
@@ -113,14 +137,6 @@
       ctx.stroke();
     });
 
-    ctx.fillStyle = z.sand;
-    ctx.beginPath();
-    ctx.moveTo(0, CH);
-    ctx.lineTo(0, CH * 0.94);
-    for (var sx = 0; sx <= CW; sx += 40) ctx.lineTo(sx, CH * 0.94 + Math.sin(sx * 0.012) * 10);
-    ctx.lineTo(CW, CH);
-    ctx.closePath();
-    ctx.fill();
   }
 
   // ---------- drawing fish (local coords: nose to the right, origin = centre) ----------
@@ -371,7 +387,8 @@
   function makeAnemones(info) {
     var count = Math.max(4, Math.round(info.W / 420)), list = [], i;
     for (i = 0; i < count; i++) {
-      list.push({ x: ((((i + rand(-0.3, 0.3)) * info.W / count) % info.W) + info.W) % info.W, y: info.H - 120 });
+      var ax = ((((i + rand(-0.3, 0.3)) * info.W / count) % info.W) + info.W) % info.W;
+      list.push({ x: ax, y: bedY(ax) - 10 });
     }
     return list;
   }
@@ -387,6 +404,7 @@
     r.y = r.info.H / 2;
     r.npcs.forEach(function (o, i) { o.x = wrapX(r.x + offs[i]); o.anchor = { x: o.x, y: o.anchor.y }; });
     r.anemones = makeAnemones(r.info);
+    r.flora = makeFlora(r.info);
     r.vx = 0;
     r.vy = 0;
     r.inv = 2.5;
@@ -405,11 +423,11 @@
     if (r.arriving) {
       // Arrivals come in from the far side of the sea (the sea wraps, so there are no edges).
       x = wrapX(r.x + (Math.random() < 0.5 ? -1 : 1) * rand(W * 0.35, W * 0.5));
-      y = rand(60, H - 60);
+      y = rand(40, bedY(x) - 30);
     } else {
       do {
         x = wrapX(r.x + rand(-W / 2, W / 2));
-        y = rand(60, H - 60);
+        y = rand(40, bedY(x) - 30);
         tries++;
       } while (distXY(x, y, r.x, r.y) < (initial ? 380 : 520) && tries < 12);
     }
@@ -422,6 +440,16 @@
       hp: maxHpOf(sp.size), maxHp: maxHpOf(sp.size), biteT: 0,
       arrive: r.arriving ? 6 : 0
     });
+    // Kelp: plankton and small fish gather round a patch, ambush fish patrol one (the loop).
+    var nn = r.npcs[r.npcs.length - 1], pa = r.flora && r.flora.length ? r.flora[Math.floor(Math.random() * r.flora.length)] : null;
+    var gather = !r.arriving && pa && ((sp.kind === 'food' && Math.random() < 0.6) || (sp.kind === 'prey' && Math.random() < 0.6) || (sp.kind === 'ambush' && Math.random() < 0.8));
+    if (gather) {
+      var ax = wrapX(pa.x + rand(-70, 70)), ay = bedY(ax) - rand(40, 110);
+      if (distXY(ax, ay, r.x, r.y) > (initial ? 380 : 520)) {
+        nn.anchor = { x: ax, y: ay }; nn.x = ax; nn.y = ay;
+        if (sp.kind === 'ambush') nn.patch = pa;
+      }
+    }
   }
 
   // ---------- combat: health, bites and chum ----------
@@ -574,7 +602,7 @@
     var tdx = dxW(tx, n.x), tdy = ty - n.y, dd = Math.hypot(tdx, tdy) || 1;
     n.vx += (tdx / dd * s - n.vx) * Math.min(1, dt * 4);
     n.vy += (tdy / dd * s - n.vy) * Math.min(1, dt * 4);
-    n.x = wrapX(n.x + n.vx * dt); n.y += n.vy * dt;
+    n.x = wrapX(n.x + n.vx * dt); n.y = clamp(n.y + n.vy * dt, 20, bedY(n.x) - 10);
     if (Math.abs(n.vx) > 3) n.facing = n.vx > 0 ? 1 : -1;
   }
 
@@ -704,7 +732,7 @@
           spawnNPC(sp, initial);
           var mate = r.npcs[r.npcs.length - 1];
           mate.x = wrapX(lead.x + rand(-120, 120));
-          mate.y = clamp(lead.y + rand(-120, 120), 60, r.info.H - 60);
+          mate.y = clamp(lead.y + rand(-120, 120), 40, bedY(mate.x) - 30);
           mate.anchor = { x: mate.x, y: mate.y };
           mate.arrive = lead.arrive;
           mate.pack = pk;
@@ -763,10 +791,26 @@
     var sp = speedFor(r.size) * (sprint ? 2.1 : 1);
     var k = Math.min(1, dt * 7);
     r.vx += (dx * sp - r.vx) * k;
-    r.vy += (dy * sp - r.vy) * k;
-    r.x = wrapX(r.x + r.vx * dt);
-    r.y = clamp(r.y + r.vy * dt, 0, r.info.H);
-    r.hidden = (r.anemones || []).some(function (a) { return distXY(a.x, a.y, r.x, r.y) < ANEMONE_R; });
+    if (!r.air) r.vy += (dy * sp - r.vy) * k;
+    r.x = wrapX(r.x + r.vx * dt + currentAt(r.y) * 0.5 * dt);
+    if (r.air) {
+      // In the air: gravity, then a splash when you land back on the surface.
+      r.vy += GRAV * dt;
+      r.y += r.vy * dt;
+      if (r.y >= 0 && r.vy > 0) {
+        r.air = false; r.y = 0; r.vy = 0;
+        burst(r.x, 0, '#cfeeff', Math.min(24, 8 + Math.floor(r.size / 2)));
+        FishSound.play('eat');
+      }
+    } else {
+      r.y += r.vy * dt;
+      if (r.y < 0) {
+        // Swimming up through the surface: hop out, higher the bigger the fish.
+        r.air = true; r.y = 0; r.vy = -Math.sqrt(2 * GRAV * hopHeight(r.size));
+      }
+      if (r.y > bedY(r.x) - 10) { r.y = bedY(r.x) - 10; r.vy = Math.min(0, r.vy); }
+    }
+    r.hidden = !!r.air || (r.anemones || []).some(function (a) { return distXY(a.x, a.y, r.x, r.y) < ANEMONE_R; });
     if (Math.abs(r.vx) > 6) r.facing = r.vx > 0 ? 1 : -1;
     if (r.inv > 0) r.inv -= dt;
   }
@@ -775,10 +819,8 @@
   function wander(n, rad) {
     var r = run;
     if (n.tT <= 0 || !n.tgt) {
-      n.tgt = {
-        x: wrapX(n.anchor.x + rand(-rad, rad)),
-        y: clamp(n.anchor.y + rand(-rad * 0.6, rad * 0.6), 0, r.info.H)
-      };
+      var tx = wrapX(n.anchor.x + rand(-rad, rad));
+      n.tgt = { x: tx, y: clamp(n.anchor.y + rand(-rad * 0.6, rad * 0.6), 20, bedY(tx) - 20) };
       n.tT = rand(2, 4);
     }
     return n.tgt;
@@ -856,7 +898,11 @@
           n.lunge = 0.9; n.cool = 3.5; n.lx = ambushPrey.x; n.ly = ambushPrey.y;
           tx = n.lx; ty = n.ly; s = speed * 3.2; k = 8;
         } else {
-          tx = n.anchor.x + Math.sin(n.t * 0.6) * 30; ty = n.anchor.y + Math.cos(n.t * 0.5) * 20; s = speed * 0.35;
+          if (n.patch) {   // a loop round its kelp: the fish grazes what gathers there
+            tx = n.anchor.x + Math.cos(n.t * 0.45) * 100; ty = n.anchor.y + Math.sin(n.t * 0.45) * 30; s = speed * 0.8;
+          } else {
+            tx = n.anchor.x + Math.sin(n.t * 0.6) * 30; ty = n.anchor.y + Math.cos(n.t * 0.5) * 20; s = speed * 0.35;
+          }
         }
       }
     } else if (sp.kind === 'hunter') {
@@ -902,8 +948,8 @@
     }
     n.vx += (dvx - n.vx) * Math.min(1, dt * k);
     n.vy += (dvy - n.vy) * Math.min(1, dt * k);
-    n.x = wrapX(n.x + n.vx * dt);
-    n.y = clamp(n.y + n.vy * dt, 0, r.info.H);
+    n.x = wrapX(n.x + n.vx * dt + currentAt(n.y) * dt);
+    n.y = clamp(n.y + n.vy * dt, 20, bedY(n.x) - 10);
     if (Math.abs(n.vx) > 3) n.facing = n.vx > 0 ? 1 : -1;
   }
 
@@ -1123,6 +1169,61 @@
   // Screen-side x for a world x: the nearest copy of it to the camera (the sea wraps).
   function viewX(x) { return cam.x + dxW(x, cam.x); }
 
+  // The sea surface and the sky above it: a wavy line that tiles with the sea.
+  function drawSurface() {
+    var halfW = CW / 2 / cam.scale + 60, x0 = cam.x - halfW, x1 = cam.x + halfW, x;
+    ctx.fillStyle = 'rgba(232,247,255,0.92)';
+    ctx.beginPath();
+    ctx.moveTo(x0, -4000);
+    for (x = x0; x <= x1; x += 12) ctx.lineTo(x, surfY(x));
+    ctx.lineTo(x1, -4000);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 3 / cam.scale;
+    ctx.beginPath();
+    for (x = x0; x <= x1; x += 12) { if (x === x0) ctx.moveTo(x, surfY(x)); else ctx.lineTo(x, surfY(x)); }
+    ctx.stroke();
+  }
+
+  // The seabed: a bumpy line of hills, sand below it. It tiles with the sea.
+  function drawSeabed(zone) {
+    var halfW = CW / 2 / cam.scale + 60, x0 = cam.x - halfW, x1 = cam.x + halfW, x;
+    ctx.fillStyle = zone.sand;
+    ctx.beginPath();
+    ctx.moveTo(x0, run.info.H + 4000);
+    for (x = x0; x <= x1; x += 12) ctx.lineTo(x, bedY(x));
+    ctx.lineTo(x1, run.info.H + 4000);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(45,58,74,0.35)';
+    ctx.lineWidth = 3 / cam.scale;
+    ctx.beginPath();
+    for (x = x0; x <= x1; x += 12) { if (x === x0) ctx.moveTo(x, bedY(x)); else ctx.lineTo(x, bedY(x)); }
+    ctx.stroke();
+  }
+
+  // Kelp: swaying stalks rising from the seabed.
+  function drawFlora(t) {
+    var halfW = CW / 2 / cam.scale + 300;
+    (run.flora || []).forEach(function (f) {
+      var px = viewX(f.x);
+      if (px < cam.x - halfW || px > cam.x + halfW) return;
+      var base = bedY(f.x), i;
+      for (i = 0; i < f.n; i++) {
+        var off = (i - (f.n - 1) / 2) * 12, sway = Math.sin(t * 1.3 + f.seed + i * 0.5) * 14;
+        var hgt = f.h * (0.75 + 0.25 * (((i * 37) % 5) / 4));
+        ctx.strokeStyle = i % 2 ? '#2f8f5b' : '#3fa36b';
+        ctx.lineWidth = 7 / cam.scale;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(px + off, base + 6);
+        ctx.quadraticCurveTo(px + off + sway * 0.3, base - hgt * 0.5, px + off + sway, base - hgt);
+        ctx.stroke();
+      }
+    });
+  }
+
   // A sea anemone: a pink mound with tentacles that wave (a safe spot, see ANEMONE_R).
   function drawAnemone(x, y, t) {
     var k = 1 / cam.scale, i;
@@ -1162,6 +1263,14 @@
     mapCtx.strokeStyle = 'rgba(45,58,74,0.5)';
     mapCtx.lineWidth = 1.5;
     [bx - w, bx, bx + w].forEach(function (x0) { mapCtx.strokeRect(x0, my(cam.y - halfH), bw, 2 * halfH / H * h); });
+    mapCtx.strokeStyle = 'rgba(45,58,74,0.45)';
+    mapCtx.lineWidth = 1;
+    mapCtx.beginPath();
+    for (var mxp = 0; mxp <= w; mxp += 2) {
+      var wx2 = mxp / w * W, yb = my(bedY(wx2));
+      if (mxp === 0) mapCtx.moveTo(mxp, yb); else mapCtx.lineTo(mxp, yb);
+    }
+    mapCtx.stroke();
     mapCtx.fillStyle = '#ff7fb0';
     (run.anemones || []).forEach(function (a) { mapCtx.fillRect(mx(a.x) - 2, my(a.y) - 2, 4, 4); });
     mapCtx.fillStyle = '#ff7a6b';
@@ -1187,6 +1296,9 @@
     ctx.scale(cam.scale, cam.scale);
     ctx.translate(-cam.x, -cam.y);
 
+    drawSurface();
+    drawSeabed(run.info.zone);
+    drawFlora(t);
     (run.anemones || []).forEach(function (a) { drawAnemone(viewX(a.x), a.y, t); });
 
     var list = run.npcs.slice();
@@ -1376,6 +1488,7 @@
     run.x = run.info.W / 2;
     run.y = run.info.H / 2;
     run.anemones = makeAnemones(run.info);
+    run.flora = makeFlora(run.info);
     cam.x = run.x;
     cam.y = run.y;
     mode = 'play';
@@ -1668,6 +1781,9 @@
   window.FishGame = {
     resize: resize,
     debugSetSize: function (s) { if (run && mode === 'play') { run.size = s; checkGrowth(); } },
+    loopErrors: function () { return errorLog.slice(); },
+    bedAt: function (x) { return run ? bedY(x) : null; },
+    surfAt: function (x) { return run ? surfY(x) : null; },
     debugMove: function (x, y) { if (run && mode === 'play') { run.x = wrapX(x); run.y = y; cam.x = run.x; cam.y = y; } },
     // Test hooks (v0.10): kill every living ally, to check the price falls back; read the ally count and price.
     debugKillAllies: function () { if (run) run.npcs.forEach(function (o) { if (o.ally) o.dead = true; }); },
@@ -1677,6 +1793,8 @@
         eaten: run ? run.eaten : 0, allySpent: run ? run.allySpent || 0 : 0,
         px: run ? run.x : null, py: run ? run.y : null, W: run ? run.info.W : null, hidden: run ? !!run.hidden : null,
         anemones: run && run.anemones ? run.anemones : null,
+        belowBed: run ? Math.max.apply(null, [-9999].concat(run.npcs.filter(function (o) { return !o.dead; }).map(function (o) { return o.y - bedY(o.x); }))) : null,
+        air: run ? !!run.air : null, flora: run && run.flora ? run.flora.length : null, bedNear: run ? Math.round(bedY(run.x)) : null,
         allies: run ? run.npcs.filter(function (o) { return o.ally && !o.dead; }).length : 0,
         allyCost: run ? run.npcs.filter(function (o) { return o.ally && !o.dead; }).length + 1 : null,
         locks: run ? run.lockedCount : 0, lives: run && run.lives,
