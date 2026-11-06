@@ -24,3 +24,4 @@
 - **The version label is read from `CFG.VERSION`.** The title and settings show the version from `js/species.js`. The HTML placeholders are overwritten at startup, so don't trust them.
 - **Ask for a device check on anything touch-related.** Headless Chromium proves layout and rules, not iPad feel. Each report should say what was not tested.
 - **Balance numbers are guesses until a timed run.** Name them as guesses (leash 300px, EXP share 50%) and ask for a play test before tuning.
+- **Measure spending with a counter, not with size.** The ally price check read size before and after a 60 ms window, and a meal or an ally's EXP share in that window read as a wrong charge. The game now keeps `allySpent`, and the check reads that.

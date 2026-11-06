@@ -92,16 +92,21 @@ async function allies(browser, url) {
   const p = ctx.page;
   const read = function () { return p.evaluate(function () { return window.FishGame.state(); }); };
   let ok = true, detail = [];
-  for (let i = 0; i < 3; i++) {
+  let buys = 0;
+  for (let tries = 0; buys < 3 && tries < 12; tries++) {
     const before = await read();
     await p.click('#ally');
     await p.waitForTimeout(60);
     const after = await read();
-    const charged = before.size - after.size;
-    if (charged > 0.01 && Math.abs(charged - before.allyCost) > 0.01) ok = false;
+    // Size also moves from meals and ally shares, so the charge is read from the spend counter, not from size.
+    const charged = after.allySpent - before.allySpent;
+    if (charged === 0 && after.allies === before.allies) continue;   // no buy happened (too little EXP)
+    buys++;
+    if (Math.abs(charged - before.allyCost) > 0.01) ok = false;
     if (after.allyCost !== after.allies + 1) ok = false;
     detail.push('charged ' + charged.toFixed(1) + ' at price ' + before.allyCost + ', now ' + after.allyCost + ' with ' + after.allies + ' alive');
   }
+  if (buys < 3) ok = false;
   check('ally price = living allies + 1, and each buy charges it', ok, detail.join('; '));
 
   const alive = await read();

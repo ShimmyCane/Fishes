@@ -255,8 +255,12 @@
     'Deep Trench', 'Oar Valley', 'Abyss Mouth', 'Whale Ocean'
   ];
 
-  // Size needed to leave each tier (tier 20 = 100 = the largest fish ever).
-  var GOALS = [2, 3, 4, 5, 7, 9, 11, 14, 17, 21, 25, 30, 36, 43, 50, 58, 67, 77, 88, 100];
+  // The player starts at this size (v0.10: was 1). Every tier goal below is scaled by it, so the climb keeps its shape.
+  var START_SIZE = 3;
+
+  // Size needed to leave each tier, before scaling (tier 20 = 100 = the largest fish ever, at START_SIZE 1).
+  var GOAL_BASE = [2, 3, 4, 5, 7, 9, 11, 14, 17, 21, 25, 30, 36, 43, 50, 58, 67, 77, 88, 100];
+  var GOALS = GOAL_BASE.map(function (g) { return g * START_SIZE; });
 
   // Difficulty is the predator:prey ratio of the fish the sea sends you.
   // "Predator" = a non-docile fish at least 1.1x your size (it can eat you).
@@ -278,7 +282,7 @@
       W: Math.round(1600 * Math.pow(1.1, n - 1)),   // the water world grows 10% per level (v0.8)
       H: Math.round(1000 * Math.pow(1.1, n - 1)),
       goal: GOALS[n - 1],
-      enterSize: n === 1 ? 1 : GOALS[n - 2]
+      enterSize: n === 1 ? START_SIZE : GOALS[n - 2]
     };
   }
 
@@ -305,6 +309,7 @@
     SPECIES: SPECIES,
     ZONES: ZONES,
     GOALS: GOALS,
+    START_SIZE: START_SIZE,
     LEVEL_NAMES: LEVEL_NAMES,
     DIFFICULTY: DIFFICULTY,
     levelInfo: levelInfo,

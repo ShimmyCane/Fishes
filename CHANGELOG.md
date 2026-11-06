@@ -3,6 +3,7 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.10 — unreleased
+- You start at size 3 (was 1). Every level's size goal is three times what it was, so the climb keeps its shape: level 1 ends at size 6, level 2 at 9, and so on up to 300 at level 20.
 - Joystick (lower left, when Controls is set to Joystick): sized to the screen, about 28% of the shorter side, with the knob and its reach scaled to match. Easier to use on iPad.
 - Ally, Sprint and ⚙️ are one column in the lower right. They scale with the screen and no longer overlap.
 - Allies: the price is one more than the number of living allies, so it falls when they die. Allies forage chum and plankton, run from anything that could eat them, and stay within reach of you. Each ally meal adds half the EXP you would get from the same meal.
