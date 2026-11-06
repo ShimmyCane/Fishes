@@ -1199,8 +1199,9 @@
   function updateCamera(dt) {
     var r = run;
     var phone = Math.min(CW, CH) < 600 ? 2.5 : 1;   // phones: everything in play is 2.5x larger
+    var ZOOM = 4;                                    // v0.10: the whole world is drawn 4x larger; the camera follows the fish
     var viewW = 900 + r.size * 10, viewH = 560 + r.size * 6;
-    cam.scale = Math.min(CW / viewW, CH / viewH) * phone;
+    cam.scale = Math.min(CW / viewW, CH / viewH) * phone * ZOOM;
     var k = Math.min(1, dt * 4);
     cam.x += (r.x - cam.x) * k;
     cam.y += (r.y - cam.y) * k;
