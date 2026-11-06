@@ -35,6 +35,13 @@
 
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
   function rand(a, b) { return a + Math.random() * (b - a); }
+
+  // ---------- the sea wraps left to right (v0.11) ----------
+  // Positions stay in [0, W). Differences take the shorter way round the sea.
+  function wrapX(x) { var W = run.info.W; return ((x % W) + W) % W; }
+  function dxW(a, b) { var W = run.info.W, d = a - b; return d - W * Math.round(d / W); }
+  function distXY(ax, ay, bx, by) { return Math.hypot(dxW(ax, bx), ay - by); }
+  function distW(a, b) { return distXY(a.x, a.y, b.x, b.y); }
   function mmss(sec) { sec = Math.floor(sec); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
 
   // Length of a fish on screen (world units). Food is drawn smaller.
@@ -359,13 +366,27 @@
   }
 
   // ---------- levels and populations ----------
+  // Sea anemones are the safe spots (v0.11): spread around the sea. A fish under one is not hunted there.
+  var ANEMONE_R = 90;
+  function makeAnemones(info) {
+    var count = Math.max(4, Math.round(info.W / 420)), list = [], i;
+    for (i = 0; i < count; i++) {
+      list.push({ x: ((((i + rand(-0.3, 0.3)) * info.W / count) % info.W) + info.W) % info.W, y: info.H - 120 });
+    }
+    return list;
+  }
+
   function enterLevel(n) {
     var r = run;
+    // Fish keep their places around you: remember each offset, then place them again on the new, larger sea.
+    var offs = r.npcs.map(function (o) { return dxW(o.x, r.x); });
     r.info = D.levelInfo(n);
     r.level = n;
     r.goal = r.info.goal;
     r.x = r.info.W / 2;
     r.y = r.info.H / 2;
+    r.npcs.forEach(function (o, i) { o.x = wrapX(r.x + offs[i]); o.anchor = { x: o.x, y: o.anchor.y }; });
+    r.anemones = makeAnemones(r.info);
     r.vx = 0;
     r.vy = 0;
     r.inv = 2.5;
@@ -382,15 +403,15 @@
   function spawnNPC(sp, initial) {
     var r = run, W = r.info.W, H = r.info.H, x = 0, y = 0, tries = 0;
     if (r.arriving) {
-      var side = Math.floor(Math.random() * 4);
-      x = side === 0 ? 40 : side === 1 ? W - 40 : rand(60, W - 60);
-      y = side === 2 ? 40 : side === 3 ? H - 40 : rand(60, H - 60);
+      // Arrivals come in from the far side of the sea (the sea wraps, so there are no edges).
+      x = wrapX(r.x + (Math.random() < 0.5 ? -1 : 1) * rand(W * 0.35, W * 0.5));
+      y = rand(60, H - 60);
     } else {
       do {
-        x = rand(60, W - 60);
+        x = wrapX(r.x + rand(-W / 2, W / 2));
         y = rand(60, H - 60);
         tries++;
-      } while (Math.hypot(x - r.x, y - r.y) < (initial ? 380 : 520) && tries < 12);
+      } while (distXY(x, y, r.x, r.y) < (initial ? 380 : 520) && tries < 12);
     }
     r.npcs.push({
       sp: sp, x: x, y: y, vx: 0, vy: 0,
@@ -435,7 +456,7 @@
   function shareLock(n) {
     if (n.pack === undefined) return;
     run.npcs.forEach(function (o) {
-      if (o !== n && o.pack === n.pack && !o.dead && !o.locked && Math.hypot(o.x - n.x, o.y - n.y) < 500) {
+      if (o !== n && o.pack === n.pack && !o.dead && !o.locked && distW(o, n) < 500) {
         o.locked = true;
         o.lockT = n.lockT;
       }
@@ -515,8 +536,8 @@
     // not overpowering). Otherwise an ally eats the nearest chum or plankton. Otherwise keep station beside you.
     // Allies stay near you (v0.10): they only hunt or forage within LEASH of you, and an ally past it heads back.
     var LEASH = 300;
-    var nearYou = function (o) { return Math.hypot(o.x - r.x, o.y - r.y) < LEASH; };
-    var away = n.ally && Math.hypot(n.x - r.x, n.y - r.y) > LEASH;
+    var nearYou = function (o) { return distW(o, r) < LEASH; };
+    var away = n.ally && distW(n, r) > LEASH;
     var big = findNear(n, 260, function (o) {
       if (o.pod) return false;
       if (n.ally) return o.sp.kind !== 'food' && o.sp.kind !== 'harmless' && o.sp.temper !== 'docile' && o.size >= n.size * 1.25;
@@ -526,11 +547,11 @@
     var food = big || prey || away || !n.ally ? null : findFeed(n, nearYou);
     var tx, ty, s;
     if (big) {
-      var bd = Math.hypot(big.x - n.x, big.y - n.y) || 1;
-      tx = n.x + (n.x - big.x) / bd * 260; ty = n.y + (n.y - big.y) / bd * 260; s = 260;
+      var bdx = dxW(n.x, big.x), bdy = n.y - big.y, bd = Math.hypot(bdx, bdy) || 1;
+      tx = n.x + bdx / bd * 260; ty = n.y + bdy / bd * 260; s = 260;
     } else if (prey) {
       tx = prey.x; ty = prey.y; s = 190;
-      if (n.biteT <= 0 && Math.hypot(prey.x - n.x, prey.y - n.y) < 40) {
+      if (n.biteT <= 0 && distW(prey, n) < 40) {
         n.biteT = STRIKE_S;
         prey.hp -= atkOf(n.size);
         burst(prey.x, prey.y, '#d9473a', 3);
@@ -542,7 +563,7 @@
       }
     } else if (food) {
       tx = food.x; ty = food.y; s = 170;
-      if (Math.hypot(food.x - n.x, food.y - n.y) < 30 && !food.dead) {
+      if (distW(food, n) < 30 && !food.dead) {
         food.dead = true;
         burst(food.x, food.y, food.sp.col || '#ffffff', 4);
         allyCredit(food);
@@ -550,10 +571,10 @@
     } else {
       tx = r.x + Math.cos(n.podA + n.t * 0.5) * 90; ty = r.y + Math.sin(n.podA + n.t * 0.5) * 90; s = 200;
     }
-    var dd = Math.hypot(tx - n.x, ty - n.y) || 1;
-    n.vx += ((tx - n.x) / dd * s - n.vx) * Math.min(1, dt * 4);
-    n.vy += ((ty - n.y) / dd * s - n.vy) * Math.min(1, dt * 4);
-    n.x += n.vx * dt; n.y += n.vy * dt;
+    var tdx = dxW(tx, n.x), tdy = ty - n.y, dd = Math.hypot(tdx, tdy) || 1;
+    n.vx += (tdx / dd * s - n.vx) * Math.min(1, dt * 4);
+    n.vy += (tdy / dd * s - n.vy) * Math.min(1, dt * 4);
+    n.x = wrapX(n.x + n.vx * dt); n.y += n.vy * dt;
     if (Math.abs(n.vx) > 3) n.facing = n.vx > 0 ? 1 : -1;
   }
 
@@ -565,7 +586,7 @@
     for (var i = 0; i < r.npcs.length; i++) {
       var o = r.npcs[i];
       if (o === victim || o === attacker || o.dead || o.sp !== victim.sp || o.biteT > 0) continue;
-      if (Math.hypot(o.x - victim.x, o.y - victim.y) > 220 || Math.hypot(o.x - ax, o.y - ay) > 260) continue;
+      if (distW(o, victim) > 220 || distXY(o.x, o.y, ax, ay) > 260) continue;
       o.biteT = STRIKE_S;
       var dmg = atkOf(o.size);
       if (isPlayer) { hurt(o, dmg); continue; }
@@ -580,7 +601,7 @@
     for (var i = 0; i < run.npcs.length; i++) {
       var o = run.npcs[i];
       if (o === n || o.dead || !test(o)) continue;
-      var d = Math.hypot(o.x - n.x, o.y - n.y);
+      var d = distW(o, n);
       if (d < bd) { bd = d; best = o; }
     }
     return best;
@@ -682,7 +703,7 @@
         for (pi = 0; pi < extra; pi++) {
           spawnNPC(sp, initial);
           var mate = r.npcs[r.npcs.length - 1];
-          mate.x = clamp(lead.x + rand(-120, 120), 60, r.info.W - 60);
+          mate.x = wrapX(lead.x + rand(-120, 120));
           mate.y = clamp(lead.y + rand(-120, 120), 60, r.info.H - 60);
           mate.anchor = { x: mate.x, y: mate.y };
           mate.arrive = lead.arrive;
@@ -719,7 +740,7 @@
       if (jm > 1) { dx /= jm; dy /= jm; }
     } else if (control === 'tap' && ptr.down) {
       var w = toWorld(ptr.x, ptr.y);
-      var ex = w.x - r.x, ey = w.y - r.y, dist = Math.hypot(ex, ey);
+      var ex = dxW(w.x, r.x), ey = w.y - r.y, dist = Math.hypot(ex, ey);
       if (dist > 14) { dx = ex / dist; dy = ey / dist; }
     }
     var kx = (keys.ArrowRight || keys.d || keys.D ? 1 : 0) - (keys.ArrowLeft || keys.a || keys.A ? 1 : 0);
@@ -743,8 +764,9 @@
     var k = Math.min(1, dt * 7);
     r.vx += (dx * sp - r.vx) * k;
     r.vy += (dy * sp - r.vy) * k;
-    r.x = clamp(r.x + r.vx * dt, 0, r.info.W);
+    r.x = wrapX(r.x + r.vx * dt);
     r.y = clamp(r.y + r.vy * dt, 0, r.info.H);
+    r.hidden = (r.anemones || []).some(function (a) { return distXY(a.x, a.y, r.x, r.y) < ANEMONE_R; });
     if (Math.abs(r.vx) > 6) r.facing = r.vx > 0 ? 1 : -1;
     if (r.inv > 0) r.inv -= dt;
   }
@@ -754,7 +776,7 @@
     var r = run;
     if (n.tT <= 0 || !n.tgt) {
       n.tgt = {
-        x: clamp(n.anchor.x + rand(-rad, rad), 0, r.info.W),
+        x: wrapX(n.anchor.x + rand(-rad, rad)),
         y: clamp(n.anchor.y + rand(-rad * 0.6, rad * 0.6), 0, r.info.H)
       };
       n.tT = rand(2, 4);
@@ -769,7 +791,7 @@
       var o = r.npcs[i];
       if (o === n || o.dead || o.sp.kind === 'food' || o.sp.kind === 'harmless') continue;
       if (o.size * 1.25 > n.size) continue;
-      var d = Math.hypot(o.x - n.x, o.y - n.y);
+      var d = distW(o, n);
       if (o.hp < o.maxHp) d *= 0.5;   // once a fish is hurt, others go for it
       if (d < bd) { bd = d; best = o; }
     }
@@ -784,7 +806,7 @@
     n.t += dt;
     n.cool = Math.max(0, n.cool - dt);
     n.tT -= dt;
-    var dxp = r.x - n.x, dyp = r.y - n.y, dp = Math.hypot(dxp, dyp) || 1;
+    var dxp = dxW(r.x, n.x), dyp = r.y - n.y, dp = Math.hypot(dxp, dyp) || 1;
     var speed = sp.speed * n.spd * (1 + 0.03 * (r.info.n - 1));
     var tx = null, ty = null, s = 0, k = 2.5;
 
@@ -793,12 +815,12 @@
       tx = fw.x; ty = fw.y; s = speed * 0.5;
     } else if (sp.kind === 'prey') {
       var fx = 0, fy = 0, threat = false, i, pr;
-      if (r.size >= n.size * 1.15 && dp < 320) { threat = true; fx -= dxp / dp; fy -= dyp / dp; }
+      if (!r.hidden && r.size >= n.size * 1.15 && dp < 320) { threat = true; fx -= dxp / dp; fy -= dyp / dp; }
       var scatter = false;
       for (i = 0; i < predators.length; i++) {
         pr = predators[i];
         if (pr.size < n.size * 1.15) continue;
-        var ddx = n.x - pr.x, ddy = n.y - pr.y, dd = Math.hypot(ddx, ddy) || 1;
+        var ddx = dxW(n.x, pr.x), ddy = n.y - pr.y, dd = Math.hypot(ddx, ddy) || 1;
         // A predator 2.5x their size makes prey scatter from further away.
         var huge = pr.size >= n.size * 2.5;
         if (dd < (huge ? 420 : 280)) { threat = true; scatter = scatter || huge; fx += ddx / dd; fy += ddy / dd; }
@@ -813,7 +835,7 @@
         for (j = 0; j < r.npcs.length; j++) {
           var o = r.npcs[j];
           if (o === n || o.sp !== sp || o.dead) continue;
-          var ex = o.x - n.x, ey = o.y - n.y;
+          var ex = dxW(o.x, n.x), ey = o.y - n.y;
           if (ex * ex + ey * ey < 260 * 260) { cx += o.x; cy += o.y; c++; }
         }
         if (c > 0) { tx = cx / c; ty = cy / c; s = speed * 0.8; }
@@ -824,7 +846,7 @@
       if (n.lunge > 0) {
         n.lunge -= dt;
         tx = n.lx; ty = n.ly; s = speed * 3.2; k = 8;
-      } else if (sp.temper === 'aggressive' && n.cool <= 0 && r.size * 1.1 < n.size && dp < range + n.size * 2) {
+      } else if (sp.temper === 'aggressive' && n.cool <= 0 && !r.hidden && r.size * 1.1 < n.size && dp < range + n.size * 2) {
         n.lunge = 0.9; n.cool = 3.5;
         n.lx = r.x; n.ly = r.y;
         tx = n.lx; ty = n.ly; s = speed * 3.2; k = 8;
@@ -838,7 +860,7 @@
         }
       }
     } else if (sp.kind === 'hunter') {
-      var canEat = r.size * 1.1 < n.size;      // the player is prey to this fish
+      var canEat = !r.hidden && r.size * 1.1 < n.size;   // the player is prey to this fish (not while hidden under an anemone)
       var playerBig = r.size > n.size * 1.25;  // a bigger fish scares it off
       if (n.locked) {
         n.lockT -= dt;
@@ -875,12 +897,12 @@
     if (n.arrive > 0) { n.arrive -= dt; tx = r.x; ty = r.y; s = speed * 0.7; }
     var dvx = 0, dvy = 0;
     if (tx !== null) {
-      var ddx2 = tx - n.x, ddy2 = ty - n.y, dd2 = Math.hypot(ddx2, ddy2);
+      var ddx2 = dxW(tx, n.x), ddy2 = ty - n.y, dd2 = Math.hypot(ddx2, ddy2);
       if (dd2 > 2) { dvx = ddx2 / dd2 * s; dvy = ddy2 / dd2 * s; }
     }
     n.vx += (dvx - n.vx) * Math.min(1, dt * k);
     n.vy += (dvy - n.vy) * Math.min(1, dt * k);
-    n.x = clamp(n.x + n.vx * dt, 0, r.info.W);
+    n.x = wrapX(n.x + n.vx * dt);
     n.y = clamp(n.y + n.vy * dt, 0, r.info.H);
     if (Math.abs(n.vx) > 3) n.facing = n.vx > 0 ? 1 : -1;
   }
@@ -939,7 +961,7 @@
     burst(n.x, n.y, n.sp.col || '#ffffff', 6);
     dropChum(n);
     if (n.sp === CHUM) {
-      var pod = run.npcs.filter(function (o) { return o.pod && !o.dead && Math.hypot(o.x - n.x, o.y - n.y) < 240; });
+      var pod = run.npcs.filter(function (o) { return o.pod && !o.dead && distW(o, n) < 240; });
       var members = run.npcs.filter(function (o) { return o.pod && !o.dead; }).length;
       if (pod.length && (run.podSpawns || 0) < 12 && Math.random() < 0.5) spawnPod();   // fed chum: the group grows
     }
@@ -965,7 +987,7 @@
     r.vy = 0;
     r.inv = 3;
     r.npcs.forEach(function (o) { o.locked = false; o.cool = 3; });
-    r.npcs = r.npcs.filter(function (o) { return Math.hypot(o.x - r.x, o.y - r.y) > 420; });
+    r.npcs = r.npcs.filter(function (o) { return distW(o, r) > 420; });
     cam.x = r.x;
     cam.y = r.y;
     showBanner('Ouch!', r.lives + (r.lives === 1 ? ' life' : ' lives') + ' left. Swim on!', 2200);
@@ -975,10 +997,10 @@
     var r = run, sp = n.sp;
     if (n.pod) return;          // your school neither hurts you nor is eaten by you
     if (n.arrive > 0) return;   // arriving fish do not touch you until they have settled
-    var d = Math.hypot(n.x - r.x, n.y - r.y);
+    var d = distW(n, r);
     var reach = (lenFor(r.size, 'round') + lenFor(n.size, sp.shape)) * 0.36;
     if (d > reach) return;
-    if (canHurt(sp) && n.size >= r.size * 1.1) {
+    if (canHurt(sp) && n.size >= r.size * 1.1 && !r.hidden) {
       if (n.biteT <= 0) { n.biteT = STRIKE_S; hurt(n, atkOf(n.size)); }
       return;
     }
@@ -1060,7 +1082,7 @@
       for (var j = 0; j < r.npcs.length; j++) {
         var meal = r.npcs[j];
         if (meal === eater || meal.dead || eater.size < meal.size * 1.25) continue;
-        var md = Math.hypot(eater.x - meal.x, eater.y - meal.y);
+        var md = distW(eater, meal);
         if (md < (lenFor(eater.size, eater.sp.shape) + lenFor(meal.size, meal.sp.shape)) * 0.36) {
           eater.biteT = meal.sp.kind === 'food' ? BITE_S : STRIKE_S;
           meal.hp -= atkOf(eater.size);
@@ -1098,22 +1120,74 @@
   }
 
   // ---------- rendering ----------
+  // Screen-side x for a world x: the nearest copy of it to the camera (the sea wraps).
+  function viewX(x) { return cam.x + dxW(x, cam.x); }
+
+  // A sea anemone: a pink mound with tentacles that wave (a safe spot, see ANEMONE_R).
+  function drawAnemone(x, y, t) {
+    var k = 1 / cam.scale, i;
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (i = 0; i < 7; i++) {
+      var bx = x + (i - 3) * 9, sway = Math.sin(t * 1.6 + i) * 10 * k;
+      ctx.strokeStyle = i % 2 ? '#f48fb1' : '#ff9ec4';
+      ctx.lineWidth = 6 * k;
+      ctx.beginPath();
+      ctx.moveTo(bx, y + 22);
+      ctx.quadraticCurveTo(bx + sway * 0.6, y - 10, bx + sway, y - 34 - (i % 3) * 6 * k);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#e3a0b8';
+    ctx.strokeStyle = OUT;
+    ctx.lineWidth = 2.5 * k;
+    ctx.beginPath();
+    ctx.ellipse(x, y + 26, 46, 16, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Mini map (v0.11): the whole sea, left to right, with the right edge joining the left.
+  // Red: big predators that can hurt you. Pink: anemones (safe spots). White: you. The box is what the screen shows.
+  var mapCanvas = $('minimap'), mapCtx = mapCanvas ? mapCanvas.getContext('2d') : null;
+  function drawMinimap() {
+    if (!mapCtx) return;
+    var W = run.info.W, H = run.info.H, w = mapCanvas.width, h = mapCanvas.height, P = run.size;
+    var mx = function (x) { return ((x % W) + W) % W / W * w; };
+    var my = function (y) { return clamp(y / H, 0, 1) * h; };
+    mapCtx.clearRect(0, 0, w, h);
+    mapCtx.fillStyle = '#e9fbf5';
+    mapCtx.fillRect(0, 0, w, h);
+    var halfW = CW / 2 / cam.scale, halfH = CH / 2 / cam.scale, bx = mx(cam.x - halfW), bw = 2 * halfW / W * w;
+    mapCtx.strokeStyle = 'rgba(45,58,74,0.5)';
+    mapCtx.lineWidth = 1.5;
+    [bx - w, bx, bx + w].forEach(function (x0) { mapCtx.strokeRect(x0, my(cam.y - halfH), bw, 2 * halfH / H * h); });
+    mapCtx.fillStyle = '#ff7fb0';
+    (run.anemones || []).forEach(function (a) { mapCtx.fillRect(mx(a.x) - 2, my(a.y) - 2, 4, 4); });
+    mapCtx.fillStyle = '#ff7a6b';
+    run.npcs.forEach(function (o) {
+      if (o.dead || o.pod || o.sp.kind === 'food') return;
+      if (canHurt(o.sp) && o.size >= P * 1.1) {
+        mapCtx.beginPath(); mapCtx.arc(mx(o.x), my(o.y), 2.5, 0, Math.PI * 2); mapCtx.fill();
+      }
+    });
+    mapCtx.fillStyle = '#ffffff';
+    mapCtx.strokeStyle = OUT;
+    mapCtx.beginPath(); mapCtx.arc(mx(run.x), my(run.y), 3.5, 0, Math.PI * 2); mapCtx.fill(); mapCtx.stroke();
+  }
   function render(t) {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     var z = run ? run.info.zone : D.ZONES[0];
     drawBackground(z, t);
     if (!run) return;
+    drawMinimap();
 
     ctx.save();
     ctx.translate(CW / 2, CH / 2);
     ctx.scale(cam.scale, cam.scale);
     ctx.translate(-cam.x, -cam.y);
 
-    ctx.setLineDash([12 / cam.scale, 10 / cam.scale]);
-    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
-    ctx.lineWidth = 3 / cam.scale;
-    ctx.strokeRect(0, 0, run.info.W, run.info.H);
-    ctx.setLineDash([]);
+    (run.anemones || []).forEach(function (a) { drawAnemone(viewX(a.x), a.y, t); });
 
     var list = run.npcs.slice();
     var playerVisible = !(run.inv > 0 && Math.floor(t * 10) % 2 === 0);
@@ -1121,6 +1195,7 @@
       list.push({ x: run.x, y: run.y, vy: run.vy, facing: run.facing, size: run.size, desc: playerDesc(), isPlayer: true, hp: run.hp, maxHp: run.maxHp });
     }
     list.sort(function (a, b) { return a.size - b.size; });
+    list = list.map(function (e) { return Object.assign({}, e, { x: viewX(e.x) }); });
     list.forEach(function (e) { drawEntity(e, t + (e.t || 0)); });
 
     list.forEach(function (e) {
@@ -1143,11 +1218,11 @@
     var plen = lenFor(run.size, playerDesc().shape);
     ctx.lineWidth = 3 / cam.scale;
     ctx.strokeStyle = 'rgba(45,58,74,0.25)';
-    ctx.beginPath(); ctx.arc(run.x, run.y, plen * 0.75, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(viewX(run.x), run.y, plen * 0.75, 0, Math.PI * 2); ctx.stroke();
     ctx.strokeStyle = ready >= 1 ? '#8fe0b5' : '#ffb27a';
-    ctx.beginPath(); ctx.arc(run.x, run.y, plen * 0.75, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ready); ctx.stroke();
+    ctx.beginPath(); ctx.arc(viewX(run.x), run.y, plen * 0.75, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ready); ctx.stroke();
 
-    run.npcs.forEach(function (n) {
+    list.forEach(function (n) {
       if (!n.locked) return;
       var rad = lenFor(n.size, n.sp.shape) * 0.75 + 6 / cam.scale;
       ctx.setLineDash([8 / cam.scale, 6 / cam.scale]);
@@ -1166,13 +1241,13 @@
         ctx.fillStyle = OUT;
         ctx.font = 'bold ' + (18 / cam.scale) + 'px system-ui, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(p.txt, p.x, p.y);
+        ctx.fillText(p.txt, viewX(p.x), p.y);
         ctx.globalAlpha = 1;
       } else {
         ctx.globalAlpha = a;
         ctx.fillStyle = p.col;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r / cam.scale * 2, 0, Math.PI * 2);
+        ctx.arc(viewX(p.x), p.y, p.r / cam.scale * 2, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalAlpha = 1;
       }
@@ -1203,7 +1278,7 @@
     var viewW = 900 + r.size * 10, viewH = 560 + r.size * 6;
     cam.scale = Math.min(CW / viewW, CH / viewH) * phone * ZOOM;
     var k = Math.min(1, dt * 4);
-    cam.x += (r.x - cam.x) * k;
+    cam.x = wrapX(cam.x + dxW(r.x, cam.x) * k);
     cam.y += (r.y - cam.y) * k;
   }
 
@@ -1300,6 +1375,7 @@
     };
     run.x = run.info.W / 2;
     run.y = run.info.H / 2;
+    run.anemones = makeAnemones(run.info);
     cam.x = run.x;
     cam.y = run.y;
     mode = 'play';
@@ -1592,12 +1668,15 @@
   window.FishGame = {
     resize: resize,
     debugSetSize: function (s) { if (run && mode === 'play') { run.size = s; checkGrowth(); } },
+    debugMove: function (x, y) { if (run && mode === 'play') { run.x = wrapX(x); run.y = y; cam.x = run.x; cam.y = y; } },
     // Test hooks (v0.10): kill every living ally, to check the price falls back; read the ally count and price.
     debugKillAllies: function () { if (run) run.npcs.forEach(function (o) { if (o.ally) o.dead = true; }); },
     state: function () {
       return {
         mode: mode, level: run && run.level, size: run && run.size, npcs: run ? run.npcs.length : 0,
         eaten: run ? run.eaten : 0, allySpent: run ? run.allySpent || 0 : 0,
+        px: run ? run.x : null, py: run ? run.y : null, W: run ? run.info.W : null, hidden: run ? !!run.hidden : null,
+        anemones: run && run.anemones ? run.anemones : null,
         allies: run ? run.npcs.filter(function (o) { return o.ally && !o.dead; }).length : 0,
         allyCost: run ? run.npcs.filter(function (o) { return o.ally && !o.dead; }).length + 1 : null,
         locks: run ? run.lockedCount : 0, lives: run && run.lives,
@@ -1605,7 +1684,7 @@
         census: run ? census() : null, spread: run ? spread() : null,
         arriving: run ? run.npcs.filter(function (o) { return o.arrive > 0; }).length : 0,
         pods: run ? run.npcs.filter(function (o) { return o.pod && !o.dead; }).length : 0,
-        nearestFood: run ? Math.round(Math.min.apply(null, [9999].concat(run.npcs.filter(function (o) { return o.sp.kind === 'food'; }).map(function (o) { return Math.hypot(o.x - run.x, o.y - run.y); })))) : null, foods: run ? run.npcs.filter(function (o) { return o.sp.kind === 'food'; }).length : 0,
+        nearestFood: run ? Math.round(Math.min.apply(null, [9999].concat(run.npcs.filter(function (o) { return o.sp.kind === 'food'; }).map(function (o) { return distXY(o.x, o.y, run.x, run.y); })))) : null, foods: run ? run.npcs.filter(function (o) { return o.sp.kind === 'food'; }).length : 0,
         chum: run ? run.npcs.filter(function (o) { return o.sp === CHUM; }).length : 0, hp: run && run.hp, maxHp: run && run.maxHp,
         player: run && { x: run.x, y: run.y }, cam: { x: cam.x, y: cam.y, scale: cam.scale },
         hunters: run ? run.npcs.filter(function (o) { return o.sp.kind === 'hunter'; }).map(function (o) { return { x: o.x, y: o.y, size: o.size, locked: o.locked }; }) : []

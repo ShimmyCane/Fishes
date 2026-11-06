@@ -3,6 +3,9 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.10 — unreleased
+- The sea has no walls. Swim off the left edge and you come out on the right (and the other way round). Fish keep their places around you when you level up.
+- Mini map in the top left: the whole sea, your position (white), big predators that can hurt you (red), sea anemones (pink) and the part of the sea the screen shows (box).
+- Sea anemones are safe spots, spread around the sea. Hide under one and nothing hunts you there, so you don't have to keep running.
 - The whole world is drawn 4× larger. Fish, plankton, the joystick and the bite ring all scale together, so you see less of the sea at once and the camera follows you.
 - You start at size 3 (was 1). Every level's size goal is three times what it was, so the climb keeps its shape: level 1 ends at size 6, level 2 at 9, and so on up to 300 at level 20.
 - Joystick (lower left, when Controls is set to Joystick): sized to the screen, about 28% of the shorter side, with the knob and its reach scaled to match. Easier to use on iPad.
