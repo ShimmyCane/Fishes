@@ -478,3 +478,11 @@ textarea {
   pointer-events: none;
 }
 .family-link[aria-pressed="true"] { background: var(--lilac); }
+
+/* Mini map (v0.11): the whole wrapping sea, play only. Its size matches the canvas attributes. */
+.minimap {
+  position: fixed; left: 12px; top: 124px; width: 170px; height: 68px;
+  border: var(--line); border-radius: 12px; background: #e9fbf5; z-index: 4; pointer-events: none;
+}
+body[data-mode="title"] .minimap,
+body[data-mode="over"] .minimap { display: none; }
