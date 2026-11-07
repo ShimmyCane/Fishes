@@ -123,6 +123,31 @@ async function allies(browser, url) {
   await p.close();
 }
 
+// Fights (v0.10): any fish can fight any fish. A bigger fish beside you takes your bite, and bites back.
+async function fights(browser, url) {
+  const ctx = await startRun(browser, url, 12, 1024, 768);
+  const p = ctx.page;
+  await p.waitForTimeout(3000);   // you start with 2.5 s of invulnerability; wait it out so the fish's bites count
+  const before = await p.evaluate(function () { return window.FishGame.state(); });
+  await p.evaluate(function () { window.FishGame.debugSpawnBeside(20); });   // bigger than you (size 12)
+  // The current carries you off, so keep you beside the test fish for a few seconds.
+  for (let i = 0; i < 16; i++) {
+    await p.evaluate(function () {
+      const s = window.FishGame.state();
+      if (s.testFish && !s.testFish.dead) window.FishGame.debugMove(s.testFish.x - 30, s.testFish.y);
+    });
+    await p.waitForTimeout(250);
+  }
+  const after = await p.evaluate(function () { return window.FishGame.state(); });
+  const tf = after.testFish;
+  const youHit = !!tf && (tf.dead || tf.hp < tf.maxHp);   // you bit it
+  const itHit = after.hp < before.hp;                      // it bit you back
+  check('a bigger fish takes your bites and bites back', youHit && itHit,
+    'its hp ' + (tf ? tf.hp + '/' + tf.maxHp : 'n/a') + ', your hp ' + before.hp.toFixed(1) + ' -> ' + after.hp.toFixed(1));
+  check('no page errors (fights)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
 async function smoke(browser, url, seconds) {
   const ctx = await startRun(browser, url, 12, 1024, 768, 'joystick');
   for (let i = 0; i < 3; i++) { await ctx.page.click('#ally'); await ctx.page.waitForTimeout(100); }
@@ -143,8 +168,9 @@ async function smoke(browser, url, seconds) {
   try {
     if (which === 'all' || which === 'layout') await layout(browser, url);
     if (which === 'all' || which === 'allies') await allies(browser, url);
+    if (which === 'all' || which === 'fights') await fights(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {

@@ -25,3 +25,4 @@
 - **Ask for a device check on anything touch-related.** Headless Chromium proves layout and rules, not iPad feel. Each report should say what was not tested.
 - **Balance numbers are guesses until a timed run.** Name them as guesses (leash 300px, EXP share 50%) and ask for a play test before tuning.
 - **Measure spending with a counter, not with size.** The ally price check read size before and after a 60 ms window, and a meal or an ally's EXP share in that window read as a wrong charge. The game now keeps `allySpent`, and the check reads that.
+- **Test a fight from both ends.** The first fight test showed the bigger fish taking bites but never biting back. The cause was the player's start invulnerability (2.5 s), which used up the fish's first bite, plus the current carrying the player out of reach. Wait out the invulnerability, and hold the player beside the test fish, before reading the damage.
