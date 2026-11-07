@@ -269,8 +269,18 @@
   var START_SIZE = 3;
 
   // Size needed to leave each tier, before scaling (tier 20 = 100 = the largest fish ever, at START_SIZE 1).
-  var GOAL_BASE = [2, 3, 4, 5, 7, 9, 11, 14, 17, 21, 25, 30, 36, 43, 50, 58, 67, 77, 88, 100];
-  var GOALS = GOAL_BASE.map(function (g) { return g * START_SIZE; });
+  // v0.11 pacing. SPAN_BASE is each level's size gain as it was (sizes 3 to 300 over 20 levels).
+  // Levels 1-5 need three times that much growth (more food before you move on); later levels need 13% less,
+  // so the largest fish is still about 300. Each meal still gives the same growth as before (levelInfo.meal).
+  var SPAN_BASE = [3, 3, 3, 3, 6, 6, 6, 9, 9, 12, 12, 15, 18, 21, 21, 24, 27, 30, 33, 36];
+  var GOALS = (function () {
+    var out = [], g = START_SIZE, i;
+    for (i = 0; i < SPAN_BASE.length; i++) {
+      g += SPAN_BASE[i] * (i < 5 ? 3 : 0.87);
+      out.push(g);
+    }
+    return out;
+  })();
 
   // Difficulty is the predator:prey ratio of the fish the sea sends you.
   // "Predator" = a non-docile fish at least 1.1x your size (it can eat you).
@@ -284,6 +294,13 @@
   function zoneIndex(n) { return n <= 4 ? 0 : n <= 8 ? 1 : n <= 12 ? 2 : n <= 16 ? 3 : 4; }
 
   var SEA_GROWTH = 1.16;   // the sea grows 16% a level (v0.11)
+  // v0.11: the sea is never too narrow for the camera. The camera widens the view with the largest fish of a level
+  // (see updateCamera in game.js), so a level's sea is at least the width that holds the 25%-interpolated view on a
+  // landscape phone (44.4 x the fish length at the goal, divided by 1 + 0.25 x the level fraction).
+  function seaWidth(n) {
+    var goal = GOALS[n - 1], t = (n - 1) / 19;
+    return Math.max(3200 * Math.pow(SEA_GROWTH, n - 1), 44.4 * (22 + 5 * goal) / (1 + 0.25 * t));
+  }
 
   function levelInfo(n) {
     return {
@@ -293,10 +310,11 @@
       zoneIndex: zoneIndex(n),
       // v0.11: the sea starts twice the v0.10 size and grows 16% a level, so the camera can show a fish
       // 25% bigger by level 20 without the view passing 80% of the sea (see updateCamera in game.js).
-      W: Math.round(3200 * Math.pow(SEA_GROWTH, n - 1)),
-      H: Math.round(2000 * Math.pow(SEA_GROWTH, n - 1)),
+      W: Math.round(seaWidth(n)),
+      H: Math.round(seaWidth(n) * 0.625),
       goal: GOALS[n - 1],
-      enterSize: n === 1 ? START_SIZE : GOALS[n - 2]
+      enterSize: n === 1 ? START_SIZE : GOALS[n - 2],
+      meal: SPAN_BASE[n - 1]   // the growth a meal gives this level (v0.11), unchanged by the XP needed
     };
   }
 

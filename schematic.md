@@ -35,7 +35,7 @@ A game inside a fish tank that becomes the ocean. You start as a baby fish eatin
 
 ## Tiers, evolution and the food chain
 
-Twenty tiers (one per level), in five depth zones. The play area starts at 3200 × 2000 and grows 16% a tier, to about 53685 × 33553 at tier 20. On screen, a fish grows 25% from tier 1 to tier 20, interpolated by level; the camera zooms out to hold that, and never shows more than 80% of the sea's width.
+Twenty tiers (one per level), in five depth zones. The play area starts at 3641 × 2276 and widens with each tier as the camera needs (about 54,000 × 33,800 at tier 20). On screen, a fish grows 25% from tier 1 to tier 20, interpolated by tier; the camera zooms out to hold that, and never shows more than 80% of the sea's width.
 
 - **Evolution:** each tier has a lead species. On reaching a tier you take its form (banner: "Evolved into …"). Tier 1 is a guppy; tier 20 is a basking shark.
 - **3–8 species per tier** (88 in total, food included), each with a temper:
