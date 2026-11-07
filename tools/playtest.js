@@ -123,23 +123,37 @@ async function allies(browser, url) {
   await p.close();
 }
 
-// Camera (v0.11): the sea is twice as big, and as you level up the view zooms out, yet the fish still looks bigger on screen.
+// Camera (v0.11): on screen, a fish grows 25% from level 1 to level 20, interpolated by level.
 async function camera(browser, url) {
   const ctx = await startRun(browser, url, 0, 1024, 768);
   const p = ctx.page;
   const read = function () { return p.evaluate(function () { return window.FishGame.state(); }); };
   await p.waitForTimeout(300);
   const first = await read();
-  await p.evaluate(function () { window.FishGame.debugSetSize(60); });   // a few levels up
+  await p.evaluate(function () { window.FishGame.debugSetSize(400); });   // past the level-20 goal (300)
   await p.waitForTimeout(600);
-  const later = await read();
-  const onScreen = function (s) { return s.size * s.cam.scale; };   // fish length on screen, in pixels
-  check('the sea is twice the old size at level 1 (3200 wide)', first.W === 3200, 'W=' + first.W);
-  check('zooms out as you level up, and the fish still looks bigger',
-    later.level > first.level && later.cam.scale < first.cam.scale && onScreen(later) > onScreen(first),
-    'level ' + first.level + '->' + later.level + ', scale ' + first.cam.scale.toFixed(2) + '->' + later.cam.scale.toFixed(2) +
-    ', on screen ' + onScreen(first).toFixed(0) + 'px->' + onScreen(later).toFixed(0) + 'px');
-  check('no page errors (camera)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  const last = await read();
+  // On-screen fish length in pixels: the sprite length (22 + 5 x size, as lenFor in game.js) times the camera scale.
+  const onScreen = function (s) { return (22 + 5 * s.size) * s.cam.scale; };
+  const ratio = onScreen(last) / onScreen(first);
+  check('the sea is 3200 wide at level 1', first.W === 3200, 'W=' + first.W);
+  check('fish looks 25% bigger by level 20 (interpolated), not more',
+    last.level === 20 && Math.abs(ratio - 1.25) < 0.02,
+    'level ' + first.level + '->' + last.level + ', size ' + first.size.toFixed(1) + '->' + last.size.toFixed(0) +
+    ', on screen ' + onScreen(first).toFixed(0) + 'px->' + onScreen(last).toFixed(0) + 'px (x' + ratio.toFixed(3) + ')');
+  // Halfway through the levels the growth is interpolated, not stepped. A fresh game, since levels only go up.
+  const mctx = await startRun(browser, url, 0, 1024, 768);
+  await mctx.page.waitForTimeout(300);
+  const start = await mctx.page.evaluate(function () { return window.FishGame.state(); });
+  await mctx.page.evaluate(function () { window.FishGame.debugSetSize(60); });   // level 10: 9/19 of the way
+  await mctx.page.waitForTimeout(600);
+  const mid = await mctx.page.evaluate(function () { return window.FishGame.state(); });
+  await mctx.page.close();
+  const expectMid = 1 + 0.25 * (mid.level - 1) / 19;
+  const midRatio = onScreen(mid) / onScreen(start);
+  check('growth is interpolated between levels 1 and 20', mid.level > 1 && mid.level < 20 && Math.abs(midRatio - expectMid) < 0.02,
+    'level ' + mid.level + ': x' + midRatio.toFixed(3) + ', expected x' + expectMid.toFixed(3));
+  check('no page errors (camera)', ctx.errors.length === 0 && mctx.errors.length === 0, ctx.errors.concat(mctx.errors).join(' | '));
   await p.close();
 }
 

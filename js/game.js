@@ -1389,15 +1389,20 @@
     ctx.fillRect(x, y, w * clamp(e.hp / e.maxHp, 0, 1), h);
   }
 
+  // v0.11: on screen, a fish grows 25% from level 1 to level 20, interpolated by level (not by size).
+  // The view widens to hold that. The view never shows more than 80% of the sea's width, so the wrapped edges stay out
+  // of view; the sea grows 16% a level (species.js) so that holds at level 20 on desktop and phones.
+  var FISH_GROWTH = 0.25;
   function updateCamera(dt) {
     var r = run;
     var phone = Math.min(CW, CH) < 600 ? 2.5 : 1;   // phones: everything in play is 2.5x larger
     var ZOOM = 4;                                    // v0.10: the whole world is drawn 4x larger; the camera follows the fish
-    // v0.11: the view widens with the level, so each level shows about 10% more sea (the sea grows 10% a level),
-    // on top of the size term. It never shows more than 80% of the sea, so the edges stay out of view.
-    var lv = Math.pow(1.1, r.info.n - 1);
-    var viewW = Math.min((900 + r.size * 10) * lv, r.info.W * 0.8), viewH = Math.min((560 + r.size * 6) * lv, r.info.H * 0.8);
-    cam.scale = Math.min(CW / viewW, CH / viewH) * phone * ZOOM;
+    var t = clamp((r.info.n - 1) / 19, 0, 1);        // 0 at level 1, 1 at level 20
+    // At level 1 the view is 930 x 578 (900 + 10 x 3, 560 + 6 x 3, the start size); the scale there is the base.
+    var base = Math.min(CW / 930, CH / 578) * phone * ZOOM;
+    var want = base * lenFor(D.START_SIZE, 'round') / lenFor(r.size, 'round') * (1 + FISH_GROWTH * t);
+    var least = CW * phone * ZOOM / (0.8 * r.info.W);   // the smallest scale that keeps the view inside 80% of the sea
+    cam.scale = Math.max(want, least);
     var k = Math.min(1, dt * 4);
     cam.x = wrapX(cam.x + dxW(r.x, cam.x) * k);
     cam.y += (r.y - cam.y) * k;

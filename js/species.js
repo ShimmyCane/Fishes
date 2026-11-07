@@ -273,14 +273,18 @@
 
   function zoneIndex(n) { return n <= 4 ? 0 : n <= 8 ? 1 : n <= 12 ? 2 : n <= 16 ? 3 : 4; }
 
+  var SEA_GROWTH = 1.16;   // the sea grows 16% a level (v0.11)
+
   function levelInfo(n) {
     return {
       n: n,
       name: LEVEL_NAMES[n - 1],
       zone: ZONES[zoneIndex(n)],
       zoneIndex: zoneIndex(n),
-      W: Math.round(3200 * Math.pow(1.1, n - 1)),   // the water world grows 10% per level (v0.8); twice the v0.10 size, to 2x (v0.11)
-      H: Math.round(2000 * Math.pow(1.1, n - 1)),
+      // v0.11: the sea starts twice the v0.10 size and grows 16% a level, so the camera can show a fish
+      // 25% bigger by level 20 without the view passing 80% of the sea (see updateCamera in game.js).
+      W: Math.round(3200 * Math.pow(SEA_GROWTH, n - 1)),
+      H: Math.round(2000 * Math.pow(SEA_GROWTH, n - 1)),
       goal: GOALS[n - 1],
       enterSize: n === 1 ? START_SIZE : GOALS[n - 2]
     };
