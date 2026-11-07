@@ -3,6 +3,10 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.11 — unreleased
+- Allies stay with you when you level up or evolve. Every fish now keeps its height relative to you, as it kept its distance sideways, so nothing is left behind in the new sea.
+- Your speed grows 3% a level, like the fish's, so the fish does not seem to slow down as the camera zooms out.
+- Bigger fish swim faster and are less nimble on turns.
+- Small fish that die in one bite no longer show a health bar.
 - The whole world is drawn 25% smaller, so the fish is less large on screen. You see a little more of the sea.
 - On tablets (screens at least 700 px wide and 600 px tall), the Ally, Attack and Sprint buttons are about twice as wide, so they are easier to hit on an iPad.
 - The mini map is in the top right. On short landscape screens it stays top left, beside the top bar, so the buttons keep clear of it.

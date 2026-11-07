@@ -334,6 +334,24 @@ async function pacing(browser, url) {
   await fctx.page.close();
 }
 
+// Allies stay with you when you level up (v0.11): they keep their places around you, as the other fish do.
+async function allyStay(browser, url) {
+  const ctx = await startRun(browser, url, 70, 1024, 768);
+  const p = ctx.page;
+  await p.waitForTimeout(300);
+  await p.click('#ally');
+  await p.waitForTimeout(300);
+  const before = await p.evaluate(function () { return window.FishGame.state(); });
+  if (before.allies === 0) { console.log('SKIP ally stay check: no ally survived to be tested. Re-run.'); await p.close(); return; }
+  await p.evaluate(function () { window.FishGame.debugSetSize(95); });   // a level or two up
+  await p.waitForTimeout(800);
+  const after = await p.evaluate(function () { return window.FishGame.state(); });
+  check('allies stay with you when you level up', after.level > before.level && after.allies > 0 && after.allyDist !== null && after.allyDist < 320,
+    'level ' + before.level + '->' + after.level + ', nearest ally ' + after.allyDist + 'px away');
+  check('no page errors (ally stay)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
 async function smoke(browser, url, seconds) {
   const ctx = await startRun(browser, url, 12, 1024, 768, 'joystick');
   for (let i = 0; i < 3; i++) { await ctx.page.click('#ally'); await ctx.page.waitForTimeout(100); }
@@ -360,8 +378,9 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'creatures') await creatures(browser, url);
     if (which === 'all' || which === 'life') await life(browser, url);
     if (which === 'all' || which === 'pacing') await pacing(browser, url);
+    if (which === 'all' || which === 'allystay') await allyStay(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {
