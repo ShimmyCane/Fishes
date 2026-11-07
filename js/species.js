@@ -15,7 +15,7 @@
      ambush      sits near a spot and lunges
      hunter      roams and chases
      harmless    drifts; never attacks (v0.11: jellyfish sting on contact; crabs stay on the seabed)
-   shape: round | slim | torpedo | puff | lantern | eel | lure | krill | plankton | oar | whale | jelly | turtle | crab (v0.11)
+   shape: round | slim | torpedo | puff | lantern | eel | lure | krill | plankton | oar | whale | jelly | turtle | crab | trash (v0.11)
 */
 (function () {
   'use strict';
@@ -46,6 +46,17 @@
       real: 'Sardine: a small schooling fish that filter-feeds on plankton.' },
     { id: 'hawkfish', name: 'Hawkfish', tier: 3, kind: 'hunter', temper: 'wary', shape: 'round', hr: 0.5, size: 2.8, speed: 90, col: '#d9573f', fin: '#c04a33',
       real: 'Hawkfish: perches on coral and drops on small fish.' },
+
+    // v0.11 trash (family setting, Settings → Trash in the sea). It drifts and costs health when touched. You cannot eat it.
+    // Turned off, the sea is clean: the trash is removed (see fillCreatures in game.js).
+    { id: 'sock', name: 'Old sock', tier: 1, kind: 'harmless', temper: 'docile', shape: 'trash', trashKind: 'sock', hr: 0.3, size: 1.8, speed: 8, col: '#c7d36b', fin: '#8f9a3e', sting: true, trash: true,
+      real: 'A sock that does not belong in the ocean.' },
+    { id: 'underwear', name: 'Underwear', tier: 1, kind: 'harmless', temper: 'docile', shape: 'trash', trashKind: 'underwear', hr: 0.3, size: 2, speed: 8, col: '#f2a7c3', fin: '#c97a9b', sting: true, trash: true,
+      real: 'Underwear, floating where it should not be.' },
+    { id: 'toycar', name: 'Toy car', tier: 1, kind: 'harmless', temper: 'docile', shape: 'trash', trashKind: 'toycar', hr: 0.4, size: 1.6, speed: 8, col: '#e64b3c', fin: '#333a44', sting: true, trash: true,
+      real: 'A plastic toy car.' },
+    { id: 'bottle', name: 'Plastic bottle', tier: 1, kind: 'harmless', temper: 'docile', shape: 'trash', trashKind: 'bottle', hr: 0.3, size: 2.2, speed: 6, col: '#bfe6ff', fin: '#7fb8e0', sting: true, trash: true,
+      real: 'A plastic bottle.' },
 
     // Tier 2 — Sea-grass Flats
     { id: 'clownfish', name: 'Clownfish', tier: 2, kind: 'prey', temper: 'docile', shape: 'round', hr: 0.6, size: 1.6, speed: 70, col: '#ff9d5c', fin: '#ff9d5c', bands: [-0.35, 0.4], bandCol: '#ffffff',
@@ -296,10 +307,10 @@
   var SEA_GROWTH = 1.16;   // the sea grows 16% a level (v0.11)
   // v0.11: the sea is never too narrow for the camera. The camera widens the view with the largest fish of a level
   // (see updateCamera in game.js), so a level's sea is at least the width that holds the 25%-interpolated view on a
-  // landscape phone (44.4 x the fish length at the goal, divided by 1 + 0.25 x the level fraction).
+  // landscape phone at 90% of the sea and a 3x zoom (39 x the fish length at the goal, divided by 1 + 0.25 x the level fraction).
   function seaWidth(n) {
     var goal = GOALS[n - 1], t = (n - 1) / 19;
-    return Math.max(3200 * Math.pow(SEA_GROWTH, n - 1), 44.4 * (22 + 5 * goal) / (1 + 0.25 * t));
+    return Math.max(2400 * Math.pow(SEA_GROWTH, n - 1), 39 * (22 + 5 * goal) / (1 + 0.25 * t));
   }
 
   function levelInfo(n) {

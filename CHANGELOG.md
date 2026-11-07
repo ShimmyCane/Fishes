@@ -3,6 +3,10 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.11 — unreleased
+- Settings → Trash in the sea: when on, socks, underwear, toy cars and plastic bottles drift in the sea. Touching one costs 2 health (every 1.5 s). You cannot eat them. Off removes them at once, for when the room is clean.
+- On tablets, the mini map is twice as big, the Attack, Ally and Sprint buttons are wider, and the settings button is bigger.
+- The enemy dots on the mini map are bigger, so the fish swimming round you are easier to see.
+- The sea is about 12% narrower, and the view can reach 90% of the sea's width (was 80%), so the world feels smaller while the 25% growth holds.
 - Settings → Notes for Jimmy has a Hide done notes toggle. It hides the notes marked done (green check) on this device; the family table is not changed.
 - Settings → Notes for Jimmy now lists the family notes with a status you can change: ◌ start anew, 🟡 testing, ✅ done. Sign in to see them. The family table has a status column for this; the family account can change only the status, not the note text.
 - Allies stay with you when you level up or evolve. Every fish now keeps its height relative to you, as it kept its distance sideways, so nothing is left behind in the new sea.

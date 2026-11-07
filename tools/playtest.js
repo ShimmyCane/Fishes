@@ -161,7 +161,7 @@ async function camera(browser, url) {
   // On-screen fish length in pixels: the sprite length (22 + 5 x size, as lenFor in game.js) times the camera scale.
   const onScreen = function (s) { return (22 + 5 * s.size) * s.cam.scale; };
   const ratio = onScreen(last) / onScreen(first);
-  check('the sea is at least 3200 wide at level 1', first.W >= 3200, 'W=' + first.W);
+  check('the sea is at least 3000 wide at level 1', first.W >= 3000, 'W=' + first.W);
   check('fish looks 25% bigger by level 20 (interpolated), not more',
     last.level === 20 && Math.abs(ratio - 1.25) < 0.02,
     'level ' + first.level + '->' + last.level + ', size ' + first.size.toFixed(1) + '->' + last.size.toFixed(0) +
@@ -216,6 +216,7 @@ async function creatures(browser, url) {
     st = await p.evaluate(function () { return window.FishGame.state(); });
     if (st.creatures.turtle >= 1 && st.creatures.crab >= 1 && st.birds >= 1) break;
   }
+  check('trash is in the sea by default', st.creatures.trash >= 1, 'trash=' + st.creatures.trash);
   check('turtles, crabs and gulls are in the sea at level 1',
     st.creatures.turtle >= 1 && st.creatures.crab >= 1 && st.birds >= 1,
     'turtles=' + st.creatures.turtle + ' crabs=' + st.creatures.crab + ' gulls=' + st.birds);
@@ -245,6 +246,20 @@ async function creatures(browser, url) {
   });
   check('a crab stays on the seabed', Math.abs(crab.y - (crab.bed - 12)) < 1,
     'crab y=' + crab.y.toFixed(1) + ', bed at its x=' + crab.bed.toFixed(1));
+  // Trash in the sea: the Settings toggle takes it out (the room is clean), and it comes back when switched on.
+  await p.click('#gear');
+  await p.waitForTimeout(300);
+  await p.evaluate(function () { document.querySelectorAll('#panel details').forEach(function (d) { d.open = true; }); });
+  await p.click('#trash-toggle');
+  await p.waitForTimeout(800);
+  const clean = await p.evaluate(function () { return window.FishGame.state(); });
+  check('turning trash off clears the sea', clean.creatures.trash === 0, 'trash=' + clean.creatures.trash);
+  await p.click('#trash-toggle');
+  await p.waitForTimeout(800);
+  const back = await p.evaluate(function () { return window.FishGame.state(); });
+  check('turning trash back on brings it back', back.creatures.trash >= 1, 'trash=' + back.creatures.trash);
+  await p.click('#gear');
+  await p.waitForTimeout(200);
   // Jellyfish come in from level 3.
   await p.evaluate(function () { window.FishGame.debugSetSize(25); });   // level 3 (starts at 21)
   await p.waitForTimeout(2500);
