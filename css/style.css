@@ -164,7 +164,9 @@ html, body {
 
 /* Tablets (v0.11): the action buttons are about twice as wide, so they are easy to hit on an iPad. */
 @media (min-width: 700px) and (min-height: 600px) {
-  .ally, .attack, .sprint { width: 16em; }
+  .ally, .attack, .sprint { width: 18em; }
+  .gear { width: 4em; height: 4em; font-size: 2.6em; }
+  .minimap { width: 340px; height: 136px; }   /* v0.11: the mini map is twice as big on tablets */
 }
 
 /* Attack button (v0.11): your allies join the fight you are in. Between Ally and Sprint. */

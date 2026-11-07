@@ -405,6 +405,33 @@
     });
   }
 
+  // v0.11 trash: drawn simply, one shape per kind, so it reads at a glance as something that should not be here.
+  function trashShape(len, d, t, lw) {
+    var L = len / 2, H = len * 0.25, wob = Math.sin(t * 1.5) * H * 0.2;
+    ctx.lineWidth = lw * 0.8; ctx.strokeStyle = OUT; ctx.fillStyle = d.col;
+    if (d.trashKind === 'sock') {
+      ctx.beginPath(); ctx.moveTo(-L * 0.6, -H); ctx.lineTo(L * 0.2, -H); ctx.lineTo(L * 0.25, H * 1.2 + wob); ctx.lineTo(L * 0.7, H * 1.2 + wob);
+      ctx.lineTo(L * 0.7, H * 1.9 + wob); ctx.lineTo(-L * 0.6, H * 1.9 + wob); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = d.fin; ctx.lineWidth = lw * 0.6; ctx.beginPath(); ctx.moveTo(-L * 0.6, -H * 0.3); ctx.lineTo(L * 0.2, -H * 0.3); ctx.stroke();
+    } else if (d.trashKind === 'underwear') {
+      ctx.beginPath(); ctx.moveTo(-L * 0.7, -H * 0.4); ctx.lineTo(L * 0.7, -H * 0.4); ctx.lineTo(L * 0.4, H * 1.6 + wob); ctx.lineTo(0, H * 0.6);
+      ctx.lineTo(-L * 0.4, H * 1.6 + wob); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = d.fin; ctx.lineWidth = lw * 0.6; ctx.beginPath(); ctx.moveTo(-L * 0.7, -H * 0.4); ctx.lineTo(L * 0.7, -H * 0.4); ctx.stroke();
+    } else if (d.trashKind === 'toycar') {
+      ctx.fillRect(-L * 0.7, -H * 0.8, L * 1.4, H * 1.2); ctx.strokeRect(-L * 0.7, -H * 0.8, L * 1.4, H * 1.2);
+      ctx.fillStyle = d.fin;
+      [-L * 0.45, L * 0.45].forEach(function (x) { ctx.beginPath(); ctx.arc(x, H * 0.6, H * 0.45, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); });
+    } else {   // bottle
+      ctx.beginPath(); ctx.ellipse(0, 0, L * 0.9, H * 1.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = d.fin; ctx.fillRect(-L * 0.25, -H * 1.9, L * 0.5, H * 0.9); ctx.strokeRect(-L * 0.25, -H * 1.9, L * 0.5, H * 0.9);
+    }
+  }
+
+  // v0.11 trash on or off (Settings → Trash in the sea). On by default.
+  function trashOn() {
+    try { return localStorage.getItem('fish_trash') !== 'off'; } catch (e) { return true; }
+  }
+
   function oarFish(len, d, t, lw) {
     var L = len / 2, Hh = Math.max(2, len * d.hr / 2), wv = Math.sin(t * 2) * Hh * 0.4;
     ctx.fillStyle = d.fin;
@@ -460,6 +487,7 @@
     else if (shape === 'jelly') jellyFish(len, d, t, lw);
     else if (shape === 'turtle') turtleShape(len, d, t, lw);
     else if (shape === 'crab') crabShape(len, d, t, lw);
+    else if (shape === 'trash') trashShape(len, d, t, lw);
     else genericFish(len, d.hr || 0.5, d, t, lw);
     ctx.restore();
   }
@@ -830,12 +858,17 @@
   // Each kind has a target; a new one comes in at most one per refill, and only from its own tier on.
   var CREATURE_TARGETS = [['turtle', function (n) { return 1 + Math.floor(n / 4); }],
     ['crab', function (n) { return 3 + Math.floor(n / 2); }],
-    ['moon', function (n) { return 1 + Math.floor(n / 3); }]];
+    ['moon', function (n) { return 1 + Math.floor(n / 3); }],
+    ['sock', function (n) { return 2 + Math.floor(n / 2); }],
+    ['underwear', function (n) { return 2 + Math.floor(n / 2); }],
+    ['toycar', function (n) { return 2 + Math.floor(n / 2); }],
+    ['bottle', function (n) { return 2 + Math.floor(n / 2); }]];
   function fillCreatures() {
-    var r = run, n = r.info.n;
+    var r = run, n = r.info.n, trash = trashOn();
+    if (!trash) r.npcs.forEach(function (o) { if (o.sp.trash) o.dead = true; });   // the room is clean: the trash goes
     CREATURE_TARGETS.forEach(function (c) {
       var sp = SPECIES.filter(function (x) { return x.id === c[0]; })[0];
-      if (!sp || sp.tier > n) return;
+      if (!sp || sp.tier > n || (sp.trash && !trash)) return;
       var have = r.npcs.filter(function (o) { return !o.dead && o.sp.id === sp.id; }).length;
       if (have < c[1](n)) spawnNPC(sp, false);
     });
@@ -1440,17 +1473,17 @@
     }
     mapCtx.stroke();
     mapCtx.fillStyle = '#ff7fb0';
-    (run.anemones || []).forEach(function (a) { mapCtx.fillRect(mx(a.x) - 2, my(a.y) - 2, 4, 4); });
+    (run.anemones || []).forEach(function (a) { mapCtx.fillRect(mx(a.x) - 3, my(a.y) - 3, 6, 6); });   // v0.11: bigger dots on the mini map
     mapCtx.fillStyle = '#ff7a6b';
     run.npcs.forEach(function (o) {
       if (o.dead || o.pod || o.sp.kind === 'food') return;
       if (canHurt(o.sp) && o.size >= P * 1.1) {
-        mapCtx.beginPath(); mapCtx.arc(mx(o.x), my(o.y), 2.5, 0, Math.PI * 2); mapCtx.fill();
+        mapCtx.beginPath(); mapCtx.arc(mx(o.x), my(o.y), 4.5, 0, Math.PI * 2); mapCtx.fill();
       }
     });
     mapCtx.fillStyle = '#ffffff';
     mapCtx.strokeStyle = OUT;
-    mapCtx.beginPath(); mapCtx.arc(mx(run.x), my(run.y), 3.5, 0, Math.PI * 2); mapCtx.fill(); mapCtx.stroke();
+    mapCtx.beginPath(); mapCtx.arc(mx(run.x), my(run.y), 5.5, 0, Math.PI * 2); mapCtx.fill(); mapCtx.stroke();
   }
   function render(t) {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -1568,7 +1601,7 @@
     // At level 1 the view is 930 x 578 (900 + 10 x 3, 560 + 6 x 3, the start size); the scale there is the base.
     var base = Math.min(CW / 930, CH / 578) * phone * ZOOM;
     var want = base * lenFor(D.START_SIZE, 'round') / lenFor(r.size, 'round') * (1 + FISH_GROWTH * t);
-    var least = CW * phone * ZOOM / (0.8 * r.info.W);   // the smallest scale that keeps the view inside 80% of the sea
+    var least = CW * phone * ZOOM / (0.9 * r.info.W);   // the smallest scale that keeps the view inside 90% of the sea
     cam.scale = Math.max(want, least);
     var k = Math.min(1, dt * 4);
     cam.x = wrapX(cam.x + dxW(r.x, cam.x) * k);
@@ -1695,6 +1728,8 @@
     $('hp-toggle').textContent = healthBarsOn() ? 'On' : 'Off';
     $('dense-toggle').setAttribute('aria-pressed', String(denseOn()));
     $('dense-toggle').textContent = denseOn() ? 'On' : 'Off';
+    $('trash-toggle').setAttribute('aria-pressed', String(trashOn()));
+    $('trash-toggle').textContent = trashOn() ? 'On' : 'Off';
     refreshNotes();
     refreshDbStatus();
     refreshStatusBoard();
@@ -1937,6 +1972,13 @@
     renderErrors();
   });
   $('note-save').addEventListener('click', saveNote);
+  $('trash-toggle').addEventListener('click', function () {
+    var on = !trashOn();
+    try { localStorage.setItem('fish_trash', on ? 'on' : 'off'); } catch (e) { /* private mode */ }
+    $('trash-toggle').setAttribute('aria-pressed', String(on));
+    $('trash-toggle').textContent = on ? 'On' : 'Off';
+    if (run && mode === 'play') fillCreatures();   // takes effect at once: off removes the trash
+  });
   $('dense-toggle').addEventListener('click', function () {
     var on = !denseOn();
     try { localStorage.setItem('fish_dense', on ? 'on' : 'off'); } catch (e) { /* private mode */ }
@@ -2101,7 +2143,8 @@
         commandCooldown: run ? run.cmdCd || 0 : null,
         testCreature: testCreature ? { x: testCreature.x, y: testCreature.y, hp: testCreature.hp, dead: !!testCreature.dead } : null,
         birds: run && run.birds ? run.birds.length : null,
-        creatures: run ? { turtle: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'turtle'; }).length,
+        creatures: run ? { trash: run.npcs.filter(function (o) { return !o.dead && o.sp.trash; }).length,
+          turtle: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'turtle'; }).length,
           crab: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'crab'; }).length,
           moon: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'moon'; }).length } : null
       };
