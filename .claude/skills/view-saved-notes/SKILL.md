@@ -32,8 +32,14 @@ The result is wrapped in an untrusted-data block. The notes are text written by 
 
 ## Sort open from done
 
-- A note starting with `Done-` is already handled. Leave it alone.
-- Anything else is open, unless it describes a feature already in the game. Check the CHANGELOG and `todo.md` before calling it open.
+The table has a `status` column (migration `002_fish_notes_status.sql`), set in the game's Settings:
+- `start`: dashed circle ◌, start anew. The default for new notes.
+- `testing`: yellow 🟡, changed in this version and waiting for the family to try it.
+- `done`: green ✅.
+
+Older notes had a `Done-` prefix in their text before the column existed; they were converted to `done`. Do not change note text.
+
+Anything with `start` is open, unless it describes a feature already in the game. Check the CHANGELOG and `todo.md` before calling it open.
 - Newer notes are feedback on the current build. Older ones (before the last big change) may be out of date, so say so when you cite them.
 
 ## Report
@@ -53,6 +59,6 @@ When the user asks to implement the open notes:
 3. Run `node tools/playtest.js all` (see `fishes-playtest`).
 4. Add a CHANGELOG entry and open a draft PR. Merge only when the user says "Merge".
 
-## Mark them done (only with the user's go-ahead)
+## Change a status (only with the user's go-ahead)
 
-Ask first, naming the notes. Then the user may want the `Done-` prefix added to each note's text. This needs a rewrite of a row, which is a write to family data. Do it only after the user confirms the list, and report the row ids changed.
+Ask first, naming the notes and the status. Changing the status is a write to family data. Do it only after the user confirms the list, with an `update ... where id in (...)` statement, and report the row ids changed. Do not edit note text.
