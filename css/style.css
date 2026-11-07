@@ -166,7 +166,6 @@ html, body {
 @media (min-width: 700px) and (min-height: 600px) {
   .ally, .attack, .sprint { width: 18em; }
   .gear { width: 4em; height: 4em; font-size: 2.6em; }
-  .minimap { width: 340px; height: 136px; }   /* v0.11: the mini map is twice as big on tablets */
 }
 
 /* Attack button (v0.11): your allies join the fight you are in. Between Ally and Sprint. */
@@ -527,7 +526,11 @@ textarea {
 }
 .family-link[aria-pressed="true"] { background: var(--lilac); }
 
-/* Mini map (v0.11): the whole wrapping sea, play only. Its size matches the canvas attributes. */
+/* Settings → Background items (v0.12): the list of what each item is. */
+.bg-list { margin: 6px 0 10px; padding-left: 1.2em; line-height: 1.45; }
+.bg-list li { margin: 4px 0; }
+
+/* Mini map (v0.11): the whole wrapping sea, play only. Its size is the CSS size; the canvas is drawn at 3x. */
 .minimap {
   position: fixed; right: 12px; top: 124px; width: 170px; height: 68px;   /* v0.11: top right, out of the way of the bigger buttons */
   border: var(--line); border-radius: 12px; background: #e9fbf5; z-index: 4; pointer-events: none;
@@ -537,4 +540,9 @@ body[data-mode="over"] .minimap { display: none; }
 /* Short landscape screens: a smaller mini map, kept top left where there is room beside the HUD. */
 @media (max-height: 500px) {
   .minimap { left: 12px; right: auto; width: 120px; height: 48px; top: 124px; }
+}
+/* Tablets (v0.12): this rule must come after the base .minimap rule above. In v0.11 the tablet size sat earlier
+   in the file, so the base rule won and the map stayed 170 px wide on an iPad. */
+@media (min-width: 700px) and (min-height: 600px) {
+  .minimap { width: 440px; height: 176px; }
 }

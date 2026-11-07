@@ -16,6 +16,9 @@
      hunter      roams and chases
      harmless    drifts; never attacks (v0.11: jellyfish sting on contact; crabs stay on the seabed)
    shape: round | slim | torpedo | puff | lantern | eel | lure | krill | plankton | oar | whale | jelly | turtle | crab | trash (v0.11)
+          | clam | rock | shrimp | urchin | boat | squid | sub (v0.12 background items)
+   bg: true   a background item (v0.12): on or off in Settings → Background items
+   surf: true sits on the surface (boats); bed: true stays on the seabed
 */
 (function () {
   'use strict';
@@ -256,7 +259,29 @@
     { id: 'whaleshark', name: 'Whale shark', tier: 20, kind: 'harmless', temper: 'docile', shape: 'whale', hr: 0.3, size: 100, speed: 35, col: '#7f9fc7', belly: '#eef6ff', spots: true, spotCol: '#ffffff',
       real: 'Whale shark: the largest fish alive. It filter-feeds on plankton, the same food you start on.' },
     { id: 'giantsunfish', name: 'Giant sunfish', tier: 20, kind: 'harmless', temper: 'docile', shape: 'round', hr: 0.95, size: 92, speed: 20, col: '#a8b8c8', fin: '#8a9cb0',
-      real: 'Giant sunfish: a huge, flat fish that drifts near the surface.' }
+      real: 'Giant sunfish: a huge, flat fish that drifts near the surface.' },
+
+    // v0.12 background items (Settings → Background items, on by default). Appended after the tiers above, so the
+    // first species of each tier (the player's form) is unchanged. bg: true means they come and go with that setting.
+    // Scenery and drifting things never chase you. Shrimp, squid and urchins are food (urchins cost spines).
+    { id: 'clam', name: 'Clam', tier: 1, kind: 'harmless', temper: 'docile', shape: 'clam', hr: 0.5, size: 2.5, speed: 0, col: '#e9d8c0', fin: '#b9977a', bed: true, bg: true,
+      real: 'Clam: sits in the sand and closes its shell when touched. Not food.' },
+    { id: 'rock', name: 'Rock', tier: 1, kind: 'harmless', temper: 'docile', shape: 'rock', hr: 0.5, size: 4, speed: 0, col: '#8a949c', fin: '#a6aeb4', bed: true, bg: true,
+      real: 'A rock on the seabed. Not food.' },
+    { id: 'shrimp', name: 'Shrimp', tier: 2, kind: 'prey', temper: 'docile', shape: 'shrimp', hr: 0.3, size: 0.9, speed: 70, col: '#ff9a8b', fin: '#ffd0c4', bg: true,
+      real: 'Shrimp: a small, edible crustacean that flicks its feelers.' },
+    { id: 'urchin', name: 'Purple sea urchin', tier: 2, kind: 'prey', temper: 'docile', shape: 'urchin', hr: 0.8, size: 1.6, speed: 14, col: '#6b3f7a', fin: '#b98bd0', spiky: true, bed: true, bg: true,
+      real: 'Purple sea urchin: covered in spines. Eating one costs you spines (2 size).' },
+    { id: 'boat', name: 'Rowing boat', tier: 4, kind: 'harmless', temper: 'docile', shape: 'boat', hr: 0.5, size: 9, speed: 12, col: '#f4f1ea', fin: '#d9573f', surf: true, bg: true,
+      real: 'A rowing boat drifting on the surface. Not food.' },
+    { id: 'squid', name: 'Squid', tier: 5, kind: 'prey', temper: 'wary', shape: 'squid', hr: 0.6, size: 4.5, speed: 95, col: '#c99cd8', fin: '#e3c6ef', bg: true,
+      real: 'Squid: jets off with a puff of ink. Edible.' },
+    { id: 'longurchin', name: 'Long-spined urchin', tier: 5, kind: 'prey', temper: 'docile', shape: 'urchin', hr: 0.9, size: 4.5, speed: 10, col: '#2c2236', fin: '#7a6a92', spiky: true, bed: true, bg: true,
+      real: 'Long-spined urchin: long black spines. Eating one costs you spines (2 size).' },
+    { id: 'sub', name: 'Submarine', tier: 6, kind: 'harmless', temper: 'docile', shape: 'sub', hr: 0.45, size: 16, speed: 30, col: '#f2c94c', fin: '#2d3a4a', bg: true,
+      real: 'A small submarine that has drifted off course. Not food.' },
+    { id: 'lionsmane', name: "Lion's mane jellyfish", tier: 7, kind: 'harmless', temper: 'docile', shape: 'jelly', hr: 0.6, size: 6, speed: 16, col: '#e0a24a', fin: '#f7d79a', sting: true, bg: true,
+      real: "Lion's mane jellyfish: a big floating bell with long tentacles. It stings on contact and cannot be eaten." }
   ];
 
   // Depth zones: the sea gets deeper, bigger and darker tier by tier.

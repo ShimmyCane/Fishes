@@ -3,6 +3,14 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.11 — unreleased
+- Allies have a limit. Your bought allies and your friends together may be at most twice your size. You cannot buy an ally that would go over it (the sea says "Your allies are full"). If you shrink below it, one follower is released at a time, every 0.6 seconds, until you are under the limit. A released fish goes back to being a wild fish. The school does not count.
+- Friends: swim up to a fish with your body shape that is 90% to 100% of your size, and keep it inside a teal ring just outside your bite range. After three seconds without touching, it joins you and fades in. Touching it, or moving away, starts the wait again. A released friend waits 20 seconds before it can join again. Friends do not raise the price of your next ally.
+- Level-ups now come one at a time, with a calm between them. After each level-up the sea is calm for five seconds: no new fish swim in, nothing can bite you, and you cannot level up again until it is over. Growth past the goal is kept, so the next level comes when the calm ends. Before, a run of meals could carry you from level 10 to level 14 at once.
+- Your school never bites itself, and during the calm nothing bites it. You never eat your school or your allies.
+- Your school changes form over a few seconds, cross-fading from the old look to the new. Quick fish take about 3.5 seconds, medium ones 5, slow ones (turtles, whales, big jellies) 7.
+- Fixed: you could bite a turtle or a crab to death and eat it, though they are harmless. Now they are not food, and your allies no longer chase them.
+- New Settings → Background items (on by default), with a list of what each item is and whether you can eat it. Scenery: clams and rocks on the bed, rowing boats on the surface, a submarine drifting by. Lion's mane jellyfish: big floating bells that sting you (not food). Food: shrimp and squid. Sea urchins: spiny; eating one costs 2 size in spines, the purple ones come early and the long-spined ones later. Kelp forests: tall, thick seaweed where small fish gather. Turning it off removes them at once.
+- Fixed: the mini map was 170 px wide on tablets, so the bigger size from 0.11 never showed. It is now 440 × 176 px on tablets (about 2.6 times the phone size), and drawn sharper.
 - New difficulty: Calm (cannot be eaten). There are no predators, and nothing can hurt you, so you can play without any stress.
 - Settings → Trash in the sea: when on, socks, underwear, toy cars and plastic bottles drift in the sea. Touching one costs 2 health (every 1.5 s). You cannot eat them. Off removes them at once, for when the room is clean.
 - On tablets, the mini map is twice as big, the Attack, Ally and Sprint buttons are wider, and the settings button is bigger.
