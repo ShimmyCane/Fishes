@@ -5,6 +5,8 @@ Every version the team can open, newest first. The version shows on the title sc
 ## 0.10 — unreleased
 - Any fish can fight any fish. Two fish that touch fight whatever their size: each bites for its attack value, and the one whose health runs out first is removed. You can now bite bigger fish, and they bite back. Food and harmless fish never bite, and fish of one species don't fight each other.
 - Allies run from anything that out-fights them (attack times health) and go for anything they can beat, rather than using a fixed size rule.
+- Denser sea (on by default, Settings → Sound, errors, display and controls): the bigger sea has four times the fish, so it is as dense as before it grew. Turn it off for the sparser sea (and a little less work for the phone).
+- The sea is twice as big in each direction. The camera zooms out a little with each level as well as with your size, so you see more of the sea as you grow, and the fish still looks bigger on screen.
 - The seabed has hills, and the surface has waves. Both repeat exactly at the edge of the sea, so the left and right sides meet without a seam.
 - Swim up through the surface and you hop out into the sky, higher the bigger you are. You splash back down when you land.
 - A current runs sideways in bands by depth, so neighbouring layers of sea drift in opposite directions. It pushes fish, and you a little.

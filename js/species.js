@@ -279,8 +279,8 @@
       name: LEVEL_NAMES[n - 1],
       zone: ZONES[zoneIndex(n)],
       zoneIndex: zoneIndex(n),
-      W: Math.round(1600 * Math.pow(1.1, n - 1)),   // the water world grows 10% per level (v0.8)
-      H: Math.round(1000 * Math.pow(1.1, n - 1)),
+      W: Math.round(3200 * Math.pow(1.1, n - 1)),   // the water world grows 10% per level (v0.8); twice the v0.10 size, to 2x (v0.11)
+      H: Math.round(2000 * Math.pow(1.1, n - 1)),
       goal: GOALS[n - 1],
       enterSize: n === 1 ? START_SIZE : GOALS[n - 2]
     };
