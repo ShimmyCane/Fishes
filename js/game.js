@@ -724,7 +724,8 @@
   // Eating chum near the pod has a chance to add a member (up to 12).
   // The school grows with your level, and it does not come back once its members are eaten (v0.8).
   // run.podSpawns counts every member ever added (levels and chum), so a dead member is never replaced.
-  function podTarget() { return run.info.n >= 10 ? Math.min(12, 2 + (run.info.n - 10)) : 0; }
+  // v0.12: the school is at most 5. Any more would drift off, so they are never added.
+  function podTarget() { return run.info.n >= 10 ? Math.min(5, 2 + (run.info.n - 10)) : 0; }
 
   // The school takes on your current species when you evolve (v0.8).
   function podSpecies() {
@@ -770,7 +771,7 @@
   // A released friend waits FRIEND_BACK_S before it can be befriended again.
   var FRIEND_S = 3, JOIN_S = 2, FRIEND_BACK_S = 20;
   function joinFriend(o) {
-    o.ally = true; o.pod = true; o.friend = true; o.joinT = 0; o.greetT = 0;
+    o.ally = true; o.pod = true; o.friend = true; o.joinT = 0; o.greetT = 0; o.joinRing = 0.8;
     o.podA = Math.random() * Math.PI * 2;   // its place round you, as the school has
     burst(o.x, o.y, '#5fd0c0', 8);
     floatText(o.x, o.y, 'Friend!');
@@ -863,6 +864,7 @@
       if (n.morph.t >= n.morph.dur) { n.sp = podSpecies(); n.morph = null; }
     }
     if (n.friend && n.joinT !== undefined && n.joinT < JOIN_S) n.joinT += dt;   // a new friend fades in as it joins
+    if (n.joinRing > 0) n.joinRing = Math.max(0, n.joinRing - dt);
     if (!n.friend) n.size = Math.max(0.5, r.size * 0.5);       // the pod grows as you grow; a friend keeps its own size
     n.hp = Math.min(n.hp, maxHpOf(n.size)); n.maxHp = maxHpOf(n.size);
     if (n.ally) {   // v0.11: heal after a pause without a hit
@@ -953,7 +955,7 @@
   // A fish's fighting value, attack times the bites it can still take. Allies use it to pick fights they can win.
   function fightPower(o) { return atkOf(o.size) * Math.max(1, o.hp); }
   function isThreat(o, P) { return canHurt(o.sp) && o.size >= P * 1.1; }
-  function isEdible(o, P) { return o.sp.kind !== 'harmless' && o.sp.kind !== 'food' && o.size <= P * 0.87 && o.size >= P * EDIBLE_MIN; }
+  function isEdible(o, P) { return o.sp.kind !== 'harmless' && o.sp.kind !== 'food' && o.size <= P * 0.87 && o.size >= P * edibleMin(); }
 
   // Fish by tier relative to you: below (prey side), same, above (predator side).
   function spread() {
@@ -1385,7 +1387,7 @@
     if (n.sp === CHUM) {
       var pod = run.npcs.filter(function (o) { return o.pod && !o.dead && distW(o, n) < 240; });
       var members = run.npcs.filter(function (o) { return o.pod && !o.dead; }).length;
-      if (pod.length && (run.podSpawns || 0) < 12 && Math.random() < 0.5) spawnPod();   // fed chum: the group grows
+      if (pod.length && (run.podSpawns || 0) < 5 && Math.random() < 0.5) spawnPod();   // fed chum: the group grows
     }
     checkGrowth();
   }
@@ -1418,9 +1420,12 @@
 
   // v0.12: you eat plankton, krill and chum only up to level 4 (the start food). A fish under half your size is not food.
   var FOOD_LAST_LEVEL = 4, EDIBLE_MIN = 0.5;
+  // v0.12: fish under this share of your size are not food. Half your size up to level 10, then 80%.
+  function edibleMin() { return run.info.n > 10 ? 0.8 : EDIBLE_MIN; }
   function checkContact(n) {
     var r = run, sp = n.sp;
     if (n.pod) return;          // your school neither hurts you nor is eaten by you
+    if (sp.id === playerDesc().id) return;   // v0.12: you never eat or fight your own species
     if (n.arrive > 0) return;   // arriving fish do not touch you until they have settled
     var d = distW(n, r);
     var reach = (lenFor(r.size, 'round') + lenFor(n.size, sp.shape)) * 0.36;
@@ -1443,7 +1448,7 @@
       hurt(n, atkOf(n.size));
       if (mode !== 'play' || run !== r) return;   // you may have lost a life (the fish is then reset)
     }
-    if (r.biteT <= 0 && n.size >= r.size * EDIBLE_MIN) {   // v0.12: you do not bite fish under half your size
+    if (r.biteT <= 0 && n.size >= r.size * edibleMin()) {   // v0.12: you do not bite fish under half your size
       r.biteT = BITE_S;
       r.lastBit = n;   // v0.11: the target your allies join when you use Attack
       n.hp -= atkOf(r.size);
@@ -1727,7 +1732,7 @@
     list.forEach(function (e) {
       var shape = e.isPlayer ? e.desc.shape : e.sp.shape;
       var len = lenFor(e.size, shape);
-      if (healthBarsOn() && (e.isPlayer || e.maxHp > 2)) drawHealthBar(e, len);   // v0.11: small fish that die in one bite get no bar
+      if (healthBarsOn() && (e.isPlayer || (e.maxHp > 2 && e.size >= run.size * 0.8))) drawHealthBar(e, len);   // v0.12: no bar under 80% of your size   // v0.11: small fish that die in one bite get no bar
       if (e.ally && !e.isPlayer) {   // v0.11: a dashed teal ring marks your bought allies, apart from the school
         ctx.save(); ctx.strokeStyle = '#5fd0c0'; ctx.lineWidth = 2 / cam.scale; ctx.setLineDash([6 / cam.scale, 5 / cam.scale]);
         ctx.beginPath(); ctx.arc(e.x, e.y, len * 0.6, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
@@ -1735,7 +1740,7 @@
       if (e.isPlayer || e.sp.kind === 'food' || e.sp.kind === 'harmless') return;
       // Readable at a glance: coral = can hurt you, mint = you can eat it.
       var danger = canHurt(e.sp) && e.size >= run.size * 1.1;
-      var edible = !danger && run.size >= e.size * 1.15 && e.size >= run.size * EDIBLE_MIN;
+      var edible = !danger && run.size >= e.size * 1.15 && e.size >= run.size * edibleMin();
       if (!danger && !edible) return;
       ctx.fillStyle = danger ? '#ff7a6b' : '#7fd8a8';
       ctx.beginPath();
@@ -1764,6 +1769,12 @@
       ctx.setLineDash([]);
     });
 
+    list.forEach(function (n) {   // v0.12: a new friend: a teal ring grows out and fades as it joins you
+      if (!(n.joinRing > 0)) return;
+      var k = 1 - n.joinRing / 0.8;
+      ctx.strokeStyle = 'rgba(95,208,192,' + (1 - k).toFixed(2) + ')'; ctx.lineWidth = 3 / cam.scale;
+      ctx.beginPath(); ctx.arc(n.x, n.y, lenFor(n.size, n.sp.shape) * (0.6 + k), 0, Math.PI * 2); ctx.stroke();
+    });
     // v0.12: a teal ring fills round a fish you are befriending. Full, it joins you (FRIEND_S seconds).
     list.forEach(function (n) {
       if (!(n.greetT > 0) || n.ally) return;

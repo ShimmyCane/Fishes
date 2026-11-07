@@ -227,6 +227,17 @@ async function edibleRules(browser, url) {
   const small = await p.evaluate(function () { return window.FishGame.state().testCreature; });
   check('a baby fish under half your size is not food for you', !!small && !small.dead && !!start && small.hp >= start.hp,
     'guppy hp ' + (start && start.hp) + ' -> ' + (small && small.hp) + ', dead=' + (small && small.dead));
+  // You never eat your own species: a fish of your form, touched for a while, is still there.
+  const formId = await p.evaluate(function () { return window.FishGame.state().form; });
+  await p.evaluate(function (id) { window.FishGame.debugSpawnCreature(id); }, formId);
+  const own0 = await p.evaluate(function () { return window.FishGame.state().testCreature; });
+  for (let i = 0; i < 12; i++) {
+    await p.evaluate(function () { const c = window.FishGame.state().testCreature; if (c && !c.dead) window.FishGame.debugMove(c.x, c.y); });
+    await p.waitForTimeout(250);
+  }
+  const own = await p.evaluate(function () { return window.FishGame.state().testCreature; });
+  check('you never eat your own species', !!own && !own.dead && !!own0 && own.hp >= own0.hp,
+    'form ' + formId + ': hp ' + (own0 && own0.hp) + ' -> ' + (own && own.hp) + ', dead=' + (own && own.dead));
   check('no page errors (edible rules)', ctx.errors.length === 0, ctx.errors.join(' | '));
   await p.close();
 }

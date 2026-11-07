@@ -7,6 +7,12 @@ Every version the team can open, newest first. The version shows on the title sc
 - Eating: plankton, krill and chum are food only up to level 4. From level 5 on they drift past you.
 - Eating: a fish under half your size is not food for you, and you do not bite it. Small fish can still bite you.
 - Easy runs 5 minutes, then it is time's up. Medium, Hard and Calm keep the 15-minute cap.
+- Calm also has a 5-minute limit, like Easy.
+- Your school is at most 5 fish. Extra school members never join, so they do not pile up in a fight.
+- You never eat or fight your own species.
+- Above level 10, you only eat fish at least 80% of your size. Up to level 10 the floor is half your size.
+- Health bars show only on fish at least 80% of your size.
+- A friend joining now has a teal ring that grows out and fades as it fades in.
 - Fixed: on Calm, a sea with no food to count could spawn a predator. Found while testing the eating rules.
 
 ## 0.11 — 2026-11-07
