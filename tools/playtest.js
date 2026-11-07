@@ -205,6 +205,21 @@ async function density(browser, url) {
   check('no page errors (density)', on.errors.length === 0 && off.errors.length === 0, on.errors.concat(off.errors).join(' | '));
 }
 
+// Life in the sea (v0.11): enough anemones and kelp that the view always has some, at every level.
+async function life(browser, url) {
+  const ctx = await startRun(browser, url, 0, 1024, 768);
+  const p = ctx.page;
+  await p.waitForTimeout(300);
+  const st = await p.evaluate(function () { return window.FishGame.state(); });
+  const anemones = (st.anemones || []).length, flora = st.flora || 0;
+  check('anemones spaced about every 210 units across the sea', anemones >= Math.floor(st.W / 210) && anemones <= Math.ceil(st.W / 210) + 1,
+    'anemones=' + anemones + ' for W=' + st.W);
+  check('kelp patches spaced about every 130 units across the sea', flora >= Math.floor(st.W / 130) && flora <= Math.ceil(st.W / 130) + 1,
+    'kelp=' + flora + ' for W=' + st.W);
+  check('no page errors (life)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
 async function smoke(browser, url, seconds) {
   const ctx = await startRun(browser, url, 12, 1024, 768, 'joystick');
   for (let i = 0; i < 3; i++) { await ctx.page.click('#ally'); await ctx.page.waitForTimeout(100); }
@@ -228,8 +243,9 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'fights') await fights(browser, url);
     if (which === 'all' || which === 'camera') await camera(browser, url);
     if (which === 'all' || which === 'density') await density(browser, url);
+    if (which === 'all' || which === 'life') await life(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {
