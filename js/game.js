@@ -480,12 +480,17 @@
     var r = run;
     // Fish keep their places around you: remember each offset, then place them again on the new, larger sea.
     var offs = r.npcs.map(function (o) { return dxW(o.x, r.x); });
+    var offY = r.npcs.map(function (o) { return o.y - r.y; });   // v0.11: keep the height too, so allies stay with you
     r.info = D.levelInfo(n);
     r.level = n;
     r.goal = r.info.goal;
     r.x = r.info.W / 2;
     r.y = r.info.H / 2;
-    r.npcs.forEach(function (o, i) { o.x = wrapX(r.x + offs[i]); o.anchor = { x: o.x, y: o.anchor.y }; });
+    r.npcs.forEach(function (o, i) {
+      o.x = wrapX(r.x + offs[i]);
+      o.y = clamp(r.y + offY[i], 20, bedY(o.x) - 10);
+      o.anchor = { x: o.x, y: o.anchor.y + (o.y - (r.y + offY[i])) };
+    });
     r.anemones = makeAnemones(r.info);
     r.birds = makeBirds(r.info);
     r.flora = makeFlora(r.info);
@@ -922,7 +927,7 @@
       if (r.sprintCd <= 0) r.stamina = Math.min(100, r.stamina + 24 * dt);
     }
     r.sprinting = sprint;
-    var sp = speedFor(r.size) * (sprint ? 2.1 : 1);
+    var sp = speedFor(r.size) * (1 + 0.03 * (r.info.n - 1)) * (sprint ? 2.1 : 1);   // v0.11: +3% a level, like the fish
     var k = Math.min(1, dt * 7);
     r.vx += (dx * sp - r.vx) * k;
     if (!r.air) r.vy += (dy * sp - r.vy) * k;
@@ -983,7 +988,7 @@
     n.cool = Math.max(0, n.cool - dt);
     n.tT -= dt;
     var dxp = dxW(r.x, n.x), dyp = r.y - n.y, dp = Math.hypot(dxp, dyp) || 1;
-    var speed = sp.speed * n.spd * (1 + 0.03 * (r.info.n - 1));
+    var speed = sp.speed * n.spd * (1 + 0.03 * (r.info.n - 1)) * (1 + Math.min(0.4, n.size / 250));   // v0.11: bigger fish are faster
     var tx = null, ty = null, s = 0, k = 2.5;
 
     if (sp.kind === 'food') {
@@ -1088,8 +1093,9 @@
       var ddx2 = dxW(tx, n.x), ddy2 = ty - n.y, dd2 = Math.hypot(ddx2, ddy2);
       if (dd2 > 2) { dvx = ddx2 / dd2 * s; dvy = ddy2 / dd2 * s; }
     }
-    n.vx += (dvx - n.vx) * Math.min(1, dt * k);
-    n.vy += (dvy - n.vy) * Math.min(1, dt * k);
+    var turn = k / (1 + n.size / 120);   // v0.11: bigger fish are less nimble on turns
+    n.vx += (dvx - n.vx) * Math.min(1, dt * turn);
+    n.vy += (dvy - n.vy) * Math.min(1, dt * turn);
     n.x = wrapX(n.x + n.vx * dt + currentAt(n.y) * dt);
     n.y = clamp(n.y + n.vy * dt, 20, bedY(n.x) - 10);
     if (sp.bed) n.y = bedY(n.x) - 12;   // v0.11: crabs walk the seabed
@@ -1476,7 +1482,7 @@
     list.forEach(function (e) {
       var shape = e.isPlayer ? e.desc.shape : e.sp.shape;
       var len = lenFor(e.size, shape);
-      if (healthBarsOn() && e.maxHp > 1) drawHealthBar(e, len);
+      if (healthBarsOn() && (e.isPlayer || e.maxHp > 2)) drawHealthBar(e, len);   // v0.11: small fish that die in one bite get no bar
       if (e.ally && !e.isPlayer) {   // v0.11: a dashed teal ring marks your bought allies, apart from the school
         ctx.save(); ctx.strokeStyle = '#5fd0c0'; ctx.lineWidth = 2 / cam.scale; ctx.setLineDash([6 / cam.scale, 5 / cam.scale]);
         ctx.beginPath(); ctx.arc(e.x, e.y, len * 0.6, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
@@ -2017,6 +2023,7 @@
         hunters: run ? run.npcs.filter(function (o) { return o.sp.kind === 'hunter'; }).map(function (o) { return { x: o.x, y: o.y, size: o.size, locked: o.locked }; }) : [],
         testFish: testFish ? { x: testFish.x, y: testFish.y, hp: testFish.hp, maxHp: testFish.maxHp, dead: !!testFish.dead } : null,
         allyHp: run ? run.npcs.filter(function (o) { return o.ally && !o.dead; }).reduce(function (a, o) { return a + o.hp; }, 0) : null,
+        allyDist: run ? (function () { var d = null; run.npcs.forEach(function (o) { if (o.ally && !o.dead) { var v = distW(o, run); if (d === null || v < d) d = v; } }); return d === null ? null : Math.round(d); })() : null,
         goal: run ? run.goal : null, fedFish: run ? run.fedFish || 0 : null,
         command: run && run.cmd ? { t: run.cmd.t, target: !run.cmd.target.dead } : null,
         commandCooldown: run ? run.cmdCd || 0 : null,
