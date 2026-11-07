@@ -1734,21 +1734,37 @@
     done: { glyph: '✅', label: 'Done' }
   };
   var NEXT_STATUS = { start: 'testing', testing: 'done', done: 'start' };
+  // Hide done notes (this device only; the family table is not changed).
+  function hideDoneOn() {
+    try { return localStorage.getItem('fish_hide_done') === 'on'; } catch (e) { return false; }
+  }
   function refreshStatusBoard() {
     var msg = $('status-msg'), box = $('status-list');
     if (!window.FishFamily || !window.FishNotes) return;
+    var hideBtn = $('hide-done');
+    hideBtn.setAttribute('aria-pressed', String(hideDoneOn()));
+    hideBtn.textContent = 'Hide done notes: ' + (hideDoneOn() ? 'On' : 'Off');
     window.FishFamily.token().then(function (token) {
       box.innerHTML = '';
       if (!token) { msg.textContent = 'Sign in to see and change the status of notes.'; return; }
       msg.textContent = 'Loading notes…';
       return window.FishNotes.remoteList(token).then(function (rows) {
-        msg.textContent = rows.length ? '' : 'No notes in the family table yet.';
-        rows.forEach(function (n) { box.appendChild(statusRow(n)); });
+        var hidden = hideDoneOn() ? rows.filter(function (n) { return n.status === 'done'; }).length : 0;
+        var shown = rows.filter(function (n) { return !(hideDoneOn() && n.status === 'done'); });
+        if (!rows.length) msg.textContent = 'No notes in the family table yet.';
+        else if (!shown.length) msg.textContent = 'All ' + rows.length + ' notes are done and hidden.';
+        else msg.textContent = hidden ? hidden + ' done ' + (hidden === 1 ? 'note is' : 'notes are') + ' hidden.' : '';
+        shown.forEach(function (n) { box.appendChild(statusRow(n)); });
       });
     }).catch(function (err) {
       msg.textContent = 'Could not load notes (' + (err && err.message || 'network') + ').';
     });
   }
+  $('hide-done').addEventListener('click', function () {
+    var on = !hideDoneOn();
+    try { localStorage.setItem('fish_hide_done', on ? 'on' : 'off'); } catch (e) { /* private mode */ }
+    refreshStatusBoard();
+  });
   function statusRow(n) {
     var item = document.createElement('div');
     item.className = 'note-item';

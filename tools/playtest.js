@@ -362,6 +362,14 @@ async function settingsPanel(browser, url) {
   const msg = await p.evaluate(function () { const e = document.getElementById('status-msg'); return e ? e.textContent : null; });
   check('settings shows the note status list, with a sign-in message when signed out',
     msg !== null && /Sign in/.test(msg), 'status-msg="' + msg + '"');
+  // Hide done notes: the toggle is there, and it flips its own state.
+  await p.evaluate(function () { document.querySelectorAll('.note-box').forEach(function (d) { d.open = true; }); });
+  await p.click('#hide-done');
+  await p.waitForTimeout(200);
+  const hd = await p.evaluate(function () { return document.getElementById('hide-done').getAttribute('aria-pressed'); });
+  check('the hide-done-notes toggle switches on', hd === 'true', 'aria-pressed=' + hd);
+  await p.click('#hide-done');
+  await p.waitForTimeout(200);
   check('no page errors (settings)', ctx.errors.length === 0, ctx.errors.join(' | '));
   await p.close();
 }

@@ -3,6 +3,7 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.11 — unreleased
+- Settings → Notes for Jimmy has a Hide done notes toggle. It hides the notes marked done (green check) on this device; the family table is not changed.
 - Settings → Notes for Jimmy now lists the family notes with a status you can change: ◌ start anew, 🟡 testing, ✅ done. Sign in to see them. The family table has a status column for this; the family account can change only the status, not the note text.
 - Allies stay with you when you level up or evolve. Every fish now keeps its height relative to you, as it kept its distance sideways, so nothing is left behind in the new sea.
 - Your speed grows 3% a level, like the fish's, so the fish does not seem to slow down as the camera zooms out.
