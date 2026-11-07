@@ -427,6 +427,83 @@
     }
   }
 
+  // v0.12 background items. Drawn simply, one shape each, so they read at a glance.
+  function clamShape(len, d, t, lw) {   // a shell on the sand that opens and shuts slowly
+    var L = len / 2, open = 0.5 + 0.5 * Math.sin(t * 0.5), Ry = L * (0.45 + 0.2 * open), i, a;
+    ctx.lineWidth = lw * 0.8; ctx.strokeStyle = OUT; ctx.fillStyle = d.col;
+    ctx.beginPath(); ctx.ellipse(0, 0, L, Ry, 0, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = d.fin; ctx.lineWidth = lw * 0.6; ctx.beginPath();
+    for (i = 1; i <= 3; i++) { a = Math.PI + i * Math.PI / 4; ctx.moveTo(0, 0); ctx.lineTo(L * Math.cos(a), Ry * Math.sin(a)); }
+    ctx.stroke();
+    ctx.fillStyle = d.fin; ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.8;
+    ctx.beginPath(); ctx.ellipse(0, 0, L, L * 0.12, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
+  function rockShape(len, d, lw) {
+    var L = len / 2, pts = [[-1, 0.3], [-0.6, -0.6], [0.1, -0.9], [0.8, -0.5], [1, 0.2], [0.5, 0.8], [-0.4, 0.85]], i;
+    ctx.beginPath();
+    for (i = 0; i < pts.length; i++) { if (i) ctx.lineTo(pts[i][0] * L, pts[i][1] * L * 0.6); else ctx.moveTo(pts[i][0] * L, pts[i][1] * L * 0.6); }
+    ctx.closePath();
+    ctx.fillStyle = d.col; ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.8; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = d.fin; ctx.beginPath(); ctx.arc(-L * 0.2, -L * 0.2, L * 0.18, 0, Math.PI * 2); ctx.fill();
+  }
+  function boatShape(len, d, t, lw) {   // a rowing boat rocking on the surface
+    var L = len / 2, H = len * 0.12, bob = Math.sin(t * 1.2) * H * 0.2;
+    ctx.lineWidth = lw * 0.8; ctx.strokeStyle = OUT;
+    ctx.fillStyle = d.fin;
+    ctx.beginPath(); ctx.moveTo(-L, bob); ctx.lineTo(L, bob); ctx.lineTo(L * 0.7, H + bob); ctx.lineTo(-L * 0.7, H + bob);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = d.col; ctx.fillRect(-L * 0.35, -H * 1.1 + bob, L * 0.7, H * 1.1); ctx.strokeRect(-L * 0.35, -H * 1.1 + bob, L * 0.7, H * 1.1);
+    ctx.beginPath(); ctx.moveTo(0, -H * 1.1 + bob); ctx.lineTo(0, -H * 3 + bob); ctx.stroke();   // mast
+    ctx.beginPath(); ctx.moveTo(0, -H * 3 + bob); ctx.lineTo(L * 0.5, -H * 1.2 + bob); ctx.lineTo(0, -H * 1.2 + bob);
+    ctx.closePath(); ctx.fill(); ctx.stroke();   // sail
+  }
+  function subShape(len, d, t, lw) {   // a small submarine: hull, conning tower, periscope, porthole, tail
+    var L = len / 2, H = len * 0.17;
+    ctx.lineWidth = lw * 0.8; ctx.strokeStyle = OUT;
+    ctx.fillStyle = d.col;
+    ctx.beginPath(); ctx.ellipse(0, 0, L, H, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = d.fin; ctx.fillRect(-L * 0.2, -H * 2.1, L * 0.3, H * 1.2); ctx.strokeRect(-L * 0.2, -H * 2.1, L * 0.3, H * 1.2);
+    ctx.beginPath(); ctx.moveTo(0, -H * 2.1); ctx.lineTo(0, -H * 2.8); ctx.lineTo(L * 0.1, -H * 2.8); ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(L * 0.35, -H * 0.1, Math.max(2, H * 0.3), 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = d.fin; ctx.beginPath(); ctx.moveTo(-L * 0.9, 0); ctx.lineTo(-L * 1.25, -H * 0.9); ctx.lineTo(-L * 1.25, H * 0.9);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  function squidShape(len, d, t, lw) {   // a squid: a long mantle, a fin, and tentacles that trail and wave
+    var L = len / 2, H = len * 0.13, i, y0, wv;
+    ctx.lineCap = 'round'; ctx.strokeStyle = d.fin; ctx.lineWidth = lw * 0.9;
+    for (i = 0; i < 6; i++) {
+      y0 = (i - 2.5) * H * 0.35; wv = Math.sin(t * 4 + i) * H * 0.5;
+      ctx.beginPath(); ctx.moveTo(-L * 0.35, y0); ctx.quadraticCurveTo(-L * 0.8, y0 + wv, -L * 1.0, y0 + wv * 1.5); ctx.stroke();
+    }
+    ctx.fillStyle = d.col; ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.8;
+    ctx.beginPath(); ctx.ellipse(-L * 0.1, 0, L * 0.7, H * 1.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = d.fin; ctx.beginPath(); ctx.moveTo(-L * 0.6, 0); ctx.lineTo(-L * 0.85, -H * 1.3); ctx.lineTo(-L * 0.85, H * 1.3);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(L * 0.35, -H * 0.2, Math.max(1.5, H * 0.35), 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1d2a33'; ctx.beginPath(); ctx.arc(L * 0.37, -H * 0.2, Math.max(1, H * 0.15), 0, Math.PI * 2); ctx.fill();
+  }
+  function urchinShape(len, d, t, lw) {   // a round body with spines all round (the spines are the protection)
+    var R = len * 0.3, i, a, r2;
+    ctx.lineCap = 'round'; ctx.strokeStyle = d.fin; ctx.lineWidth = lw * 0.9;
+    for (i = 0; i < 14; i++) {
+      a = i * Math.PI * 2 / 14 + Math.sin(t * 0.8 + i) * 0.05; r2 = R * (1.6 + 0.3 * ((i * 7) % 3) / 2);
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * R * 0.8, Math.sin(a) * R * 0.8); ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2); ctx.stroke();
+    }
+    ctx.fillStyle = d.col; ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.8;
+    ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
+  function shrimpShape(len, d, t, lw) {   // a curled body with feelers at the head (right)
+    var L = len / 2, rad = len * 0.07, i, x, y, hx = L * 0.72, hy = -L * 0.5;
+    ctx.lineWidth = lw * 0.6; ctx.strokeStyle = OUT; ctx.fillStyle = d.col;
+    for (i = 0; i < 5; i++) {
+      x = -L * 0.8 + i * L * 0.38; y = -Math.pow(i / 4, 2) * L * 0.5 + Math.sin(t * 5 + i) * rad * 0.2;
+      ctx.beginPath(); ctx.arc(x, y, rad * (1.1 - i * 0.08), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    ctx.strokeStyle = d.fin; ctx.lineWidth = lw * 0.5; ctx.beginPath();
+    ctx.moveTo(hx, hy); ctx.lineTo(hx + L * 0.33, hy - L * 0.3); ctx.moveTo(hx, hy); ctx.lineTo(hx + L * 0.23, hy - L * 0.4); ctx.stroke();
+    ctx.fillStyle = '#1d2a33'; ctx.beginPath(); ctx.arc(hx, hy, rad * 0.35, 0, Math.PI * 2); ctx.fill();
+  }
+
   // v0.11 trash on or off (Settings → Trash in the sea). On by default.
   function trashOn() {
     try { return localStorage.getItem('fish_trash') !== 'off'; } catch (e) { return true; }
@@ -472,7 +549,17 @@
   }
 
   function drawEntity(e, t) {
-    var d = e.desc || e.sp, len = lenFor(e.size, d.shape), lw = 2.4 / cam.scale;
+    if (e.morph) {   // v0.12: a school member changing form cross-fades from its old look to its new one
+      var p = clamp(e.morph.t / e.morph.dur, 0, 1);
+      ctx.globalAlpha = 1 - p; drawBody(e, e.morph.from, t);
+      ctx.globalAlpha = p; drawBody(e, e.sp, t);
+      ctx.globalAlpha = 1;
+      return;
+    }
+    drawBody(e, e.desc || e.sp, t);
+  }
+  function drawBody(e, d, t) {
+    var len = lenFor(e.size, d.shape), lw = 2.4 / cam.scale;
     var f = e.facing || 1;
     ctx.save();
     ctx.translate(e.x, e.y);
@@ -488,6 +575,13 @@
     else if (shape === 'turtle') turtleShape(len, d, t, lw);
     else if (shape === 'crab') crabShape(len, d, t, lw);
     else if (shape === 'trash') trashShape(len, d, t, lw);
+    else if (shape === 'clam') clamShape(len, d, t, lw);
+    else if (shape === 'rock') rockShape(len, d, lw);
+    else if (shape === 'boat') boatShape(len, d, t, lw);
+    else if (shape === 'sub') subShape(len, d, t, lw);
+    else if (shape === 'squid') squidShape(len, d, t, lw);
+    else if (shape === 'urchin') urchinShape(len, d, t, lw);
+    else if (shape === 'shrimp') shrimpShape(len, d, t, lw);
     else genericFish(len, d.hr || 0.5, d, t, lw);
     ctx.restore();
   }
@@ -503,6 +597,14 @@
     }
     return list;
   }
+
+  // v0.12: after a level-up the sea is calm for CALM_S seconds. No new fish swim in, you cannot level up again,
+  // and nothing bites your school, so a run of meals cannot jump several levels at once.
+  // Your school changes form over morphTime (slow species take longer, quick ones less).
+  var CALM_S = 5;
+  function morphTime(sp) { return sp.speed < 40 ? 7 : sp.speed >= 100 ? 3.5 : 5; }
+  // v0.12 background items (Settings → Background items). On by default.
+  function bgOn() { try { return localStorage.getItem('fish_bg') !== 'off'; } catch (e) { return true; } }
 
   function enterLevel(n) {
     var r = run;
@@ -522,15 +624,20 @@
     r.anemones = makeAnemones(r.info);
     r.birds = makeBirds(r.info);
     r.flora = makeFlora(r.info);
+    syncForest();
     r.vx = 0;
     r.vy = 0;
-    r.inv = 2.5;
+    r.inv = CALM_S;   // v0.12: the calm: nothing bites you while it lasts
+    r.calmT = CALM_S;
     cam.x = r.x;
     cam.y = r.y;
     // The fish already around you stay. New species only appear far away, gradually (see fillPopulations).
     if (r.zoneFrom !== r.info.zone) { r.zoneOld = r.zoneFrom || r.info.zone; r.zoneFrom = r.info.zone; r.bgT = 0; }
     var lead = D.leadOf(n), evolved = !!r.form && r.form.id !== lead.id;
     r.form = lead;
+    if (evolved) r.npcs.forEach(function (o) {   // v0.12: your school changes form over a few seconds, not at once
+      if (o.pod && !o.dead) o.morph = { from: o.morph ? o.morph.from : o.sp, t: 0, dur: morphTime(lead) };
+    });
     showBanner(evolved ? 'Evolved into ' + lead.name + '!' : 'Level ' + n + ': ' + r.info.name,
       (evolved ? 'Level ' + n + ': ' + r.info.name + '. ' : '') + r.info.zone.name + '. Goal: size ' + r.info.goal, 3200);
   }
@@ -701,6 +808,10 @@
     var r = run, sp = n.sp;
     n.t += dt;
     n.biteT = Math.max(0, n.biteT - dt);
+    if (n.morph) {   // v0.12: the school changes form over a few seconds (the old and new looks cross-fade, see drawEntity)
+      n.morph.t += dt;
+      if (n.morph.t >= n.morph.dur) { n.sp = podSpecies(); n.morph = null; }
+    }
     n.size = Math.max(0.5, r.size * 0.5);                      // the pod grows as you grow
     n.hp = Math.min(n.hp, maxHpOf(n.size)); n.maxHp = maxHpOf(n.size);
     if (n.ally) {   // v0.11: heal after a pause without a hit
@@ -718,7 +829,7 @@
     // v0.10: values decide. Run from a fish that out-fights this one (attack x health); go for one it can beat.
     // The bites come from the fight loop in update(), so this only steers.
     var big = findNear(n, 260, function (o) { return !o.pod && canBite(o.sp) && fightPower(o) > fightPower(n); });
-    var prey = big || away ? null : findNear(n, 220, function (o) { return !o.pod && o.sp.kind !== 'food' && fightPower(o) <= fightPower(n) && (!n.ally || nearYou(o)); });
+    var prey = big || away ? null : findNear(n, 220, function (o) { return !o.pod && o.sp.kind !== 'food' && o.sp.kind !== 'harmless' && fightPower(o) <= fightPower(n) && (!n.ally || nearYou(o)); });
     var cmd = n.ally && r.cmd && !r.cmd.target.dead ? r.cmd.target : null;   // v0.11: Attack overrides running and foraging
     if (cmd) { big = null; prey = cmd; }
     var food = big || prey || away || !n.ally ? null : findFeed(n, nearYou);
@@ -832,8 +943,9 @@
       if (role === 'harmless') return sp.tier >= t && sp.tier <= t + 3;
       return sp.tier <= t && sp.tier >= t - 3;
     };
+    var bg = bgOn();
     var fits = function (sp) {
-      if (sp.kind === 'food') return false;
+      if (sp.kind === 'food' || sp.bg) return false;   // v0.12: background items are placed by fillCreatures, by level
       if (role === 'threat') return canHurt(sp) && sp.size >= P * 1.15 && sp.size <= P * 1.9;
       if (role === 'harmless') return sp.kind === 'harmless' && sp.size <= P * 1.6;
       return sp.kind !== 'harmless' && sp.size >= P * 0.25 && sp.size <= P * 0.85;
@@ -862,13 +974,40 @@
     ['sock', function (n) { return 2 + Math.floor(n / 2); }],
     ['underwear', function (n) { return 2 + Math.floor(n / 2); }],
     ['toycar', function (n) { return 2 + Math.floor(n / 2); }],
-    ['bottle', function (n) { return 2 + Math.floor(n / 2); }]];
+    ['bottle', function (n) { return 2 + Math.floor(n / 2); }],
+    // v0.12 background items, by level (their tier gates them). Scenery and floating things never hunt. Shrimp, squid
+    // and urchins are food: they are placed here, not by size, so they are in the sea at the levels where they belong.
+    ['clam', function (n) { return 2 + Math.floor(n / 3); }],
+    ['rock', function (n) { return 2 + Math.floor(n / 2); }],
+    ['boat', function (n) { return 1 + Math.floor(n / 4); }],
+    ['sub', function (n) { return 1 + Math.floor(n / 8); }],
+    ['lionsmane', function (n) { return 1 + Math.floor(n / 4); }],
+    ['shrimp', function (n) { return 3 + Math.floor(n / 2); }],
+    ['urchin', function (n) { return 2 + Math.floor(n / 3); }],
+    ['longurchin', function (n) { return 1 + Math.floor(n / 4); }],
+    ['squid', function (n) { return 2 + Math.floor(n / 3); }]];
+  // v0.12 kelp forest: tall, thick seaweed patches. They are on while background items are on, and go when it is off.
+  function makeForests(info) {
+    var count = Math.max(2, Math.round(info.W / 700)), list = [], i;
+    for (i = 0; i < count; i++) {
+      list.push({ x: rand(0, info.W), h: rand(170, 260), n: 9 + Math.floor(Math.random() * 4), seed: Math.random() * 10, forest: true });
+    }
+    return list;
+  }
+  function syncForest() {
+    var r = run, on = bgOn();
+    if (!r || !r.flora) return;
+    r.flora = r.flora.filter(function (f) { return !f.forest || on; });
+    if (on && !r.flora.some(function (f) { return f.forest; })) r.flora = r.flora.concat(makeForests(r.info));
+  }
   function fillCreatures() {
-    var r = run, n = r.info.n, trash = trashOn();
+    var r = run, n = r.info.n, trash = trashOn(), bg = bgOn();
     if (!trash) r.npcs.forEach(function (o) { if (o.sp.trash) o.dead = true; });   // the room is clean: the trash goes
+    if (!bg) r.npcs.forEach(function (o) { if (o.sp.bg) o.dead = true; });        // v0.12: so do the background items
+    syncForest();
     CREATURE_TARGETS.forEach(function (c) {
       var sp = SPECIES.filter(function (x) { return x.id === c[0]; })[0];
-      if (!sp || sp.tier > n || (sp.trash && !trash)) return;
+      if (!sp || sp.tier > n || (sp.trash && !trash) || (sp.bg && !bg)) return;
       var have = r.npcs.filter(function (o) { return !o.dead && o.sp.id === sp.id; }).length;
       if (have < c[1](n)) spawnNPC(sp, false);
     });
@@ -1132,6 +1271,7 @@
     n.x = wrapX(n.x + n.vx * dt + currentAt(n.y) * dt);
     n.y = clamp(n.y + n.vy * dt, 20, bedY(n.x) - 10);
     if (sp.bed) n.y = bedY(n.x) - 12;   // v0.11: crabs walk the seabed
+    if (sp.surf) n.y = surfY(n.x) - 26;   // v0.12: boats float on the surface
     if (Math.abs(n.vx) > 3) n.facing = n.vx > 0 ? 1 : -1;
   }
 
@@ -1156,18 +1296,19 @@
     run.parts = run.parts.filter(function (p) { return p.life > 0; });
   }
 
+  // v0.12: one level at a time. A level-up starts the calm, and no other level-up can happen until it is over.
+  // Growth past the goal is kept, so the next level comes when the calm ends (update checks it every frame).
   function checkGrowth() {
-    while (run && mode === 'play' && run.size >= run.goal) {
-      if (run.info.n >= 20) {
-        // Endless (v0.9): no win and no time cap after level 20. The goal keeps rising, and the score goes up.
-        run.goal = run.goal * 1.25;
-        FishSound.play('levelup');
-        showBanner('Endless', 'Next goal: size ' + run.goal.toFixed(0), 2500);
-        continue;
-      }
-      FishSound.play('levelup');
-      enterLevel(run.info.n + 1);
+    if (!run || mode !== 'play' || (run.calmT || 0) > 0 || run.size < run.goal) return;
+    FishSound.play('levelup');
+    if (run.info.n >= 20) {
+      // Endless (v0.9): no win and no time cap after level 20. The goal keeps rising, and the score goes up.
+      run.goal = run.goal * 1.25;
+      run.calmT = CALM_S;
+      showBanner('Endless', 'Next goal: size ' + run.goal.toFixed(0), 2500);
+      return;
     }
+    enterLevel(run.info.n + 1);
   }
 
   function eatNPC(n) {
@@ -1238,6 +1379,8 @@
       if (n.biteT <= 0 && !r.hidden) { n.biteT = 1.5; hurt(n, 2); if (mode !== 'play' || run !== r) return; }
       return;
     }
+    // v0.12: harmless creatures (crabs, turtles, clams, rocks, boats, a submarine) are never food: you touch them and move on.
+    if (sp.kind === 'harmless') return;
     // v0.10: a fight with a fish of any size. Each side bites on its own timer, for its attack value.
     // Hidden under an anemone, the fish cannot bite you; you can still bite it.
     if (canBite(sp) && !r.hidden && n.biteT <= 0) {
@@ -1294,6 +1437,7 @@
     r.t += dt;
     r.tension = clamp((r.t - CFG.TENSION.start) / (CFG.TENSION.full - CFG.TENSION.start), 0, 1);
     r.bgT = Math.min(1, (r.bgT || 0) + dt / 2);
+    r.calmT = Math.max(0, (r.calmT || 0) - dt);   // v0.12: the calm after a level-up
     if (r.t >= CFG.TIME_LIMIT && r.info.n < 20) { endRun('time'); return; }   // endless after level 20: no time cap
 
     updatePlayer(dt);
@@ -1303,7 +1447,8 @@
     if (r.cmd) { r.cmd.t -= dt; if (r.cmd.t <= 0 || r.cmd.target.dead) r.cmd = null; }
     if (r.cmdCd > 0) r.cmdCd = Math.max(0, r.cmdCd - dt);
     r.spawnT = (r.spawnT || 0) - dt;
-    if (r.spawnT <= 0) { r.spawnT = 1.2; fillPopulations(false); }
+    // v0.12: no new fish swim in during the calm; the sea you have settles first.
+    if (r.spawnT <= 0) { r.spawnT = 1.2; if (r.calmT <= 0) fillPopulations(false); }
 
     var predators = r.npcs.filter(function (o) {
       return !o.dead && (o.sp.kind === 'hunter' || o.sp.kind === 'ambush');
@@ -1312,7 +1457,8 @@
     for (i = 0; i < r.npcs.length; i++) {
       if (!r.npcs[i].dead) updateNPC(r.npcs[i], dt, predators);
     }
-    if (r.growPending) { r.growPending = false; checkGrowth(); }   // ally meals add to your size (v0.10)
+    // Ally meals add to your size (v0.10). v0.12: growth past the goal waits for the calm to end, then one level.
+    if (r.growPending || r.size >= r.goal) { r.growPending = false; checkGrowth(); }
 
     // Fights between fish (v0.10): any fish bites any fish it touches, except food and its own species.
     // Each bite takes off the attacker's attack value; a fish is out when its health reaches zero.
@@ -1323,6 +1469,10 @@
       for (var j = 0; j < r.npcs.length; j++) {
         var meal = r.npcs[j];
         if (meal === eater || meal.dead || meal.sp === eater.sp) continue;
+        // v0.12: your school never fights itself, nothing bites it during the calm, and harmless creatures are not food.
+        if (eater.pod && meal.pod) continue;
+        if (meal.pod && r.calmT > 0) continue;
+        if (meal.sp.kind === 'harmless') continue;
         var md = distW(eater, meal);
         if (md < (lenFor(eater.size, eater.sp.shape) + lenFor(meal.size, meal.sp.shape)) * 0.36) {
           if (meal.sp.kind === 'food') {   // v0.11: small fish eat plankton and chum they touch
@@ -1455,10 +1605,13 @@
   var mapCanvas = $('minimap'), mapCtx = mapCanvas ? mapCanvas.getContext('2d') : null;
   function drawMinimap() {
     if (!mapCtx) return;
-    var W = run.info.W, H = run.info.H, w = mapCanvas.width, h = mapCanvas.height, P = run.size;
+    // v0.12: drawn in a 170 x 68 space. The canvas is K times that, so the bigger tablet map stays sharp.
+    var W = run.info.W, H = run.info.H, K = mapCanvas.width / 170, w = 170, h = 68, P = run.size;
     var mx = function (x) { return ((x % W) + W) % W / W * w; };
     var my = function (y) { return clamp(y / H, 0, 1) * h; };
-    mapCtx.clearRect(0, 0, w, h);
+    mapCtx.setTransform(1, 0, 0, 1, 0, 0);
+    mapCtx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
+    mapCtx.setTransform(K, 0, 0, K, 0, 0);
     mapCtx.fillStyle = '#e9fbf5';
     mapCtx.fillRect(0, 0, w, h);
     var halfW = CW / 2 / cam.scale, halfH = CH / 2 / cam.scale, bx = mx(cam.x - halfW), bw = 2 * halfW / W * w;
@@ -1731,6 +1884,8 @@
     $('dense-toggle').textContent = denseOn() ? 'On' : 'Off';
     $('trash-toggle').setAttribute('aria-pressed', String(trashOn()));
     $('trash-toggle').textContent = trashOn() ? 'On' : 'Off';
+    $('bg-toggle').setAttribute('aria-pressed', String(bgOn()));
+    $('bg-toggle').textContent = bgOn() ? 'On' : 'Off';
     refreshNotes();
     refreshDbStatus();
     refreshStatusBoard();
@@ -1980,6 +2135,13 @@
     $('trash-toggle').textContent = on ? 'On' : 'Off';
     if (run && mode === 'play') fillCreatures();   // takes effect at once: off removes the trash
   });
+  $('bg-toggle').addEventListener('click', function () {
+    var on = !bgOn();
+    try { localStorage.setItem('fish_bg', on ? 'on' : 'off'); } catch (e) { /* private mode */ }
+    $('bg-toggle').setAttribute('aria-pressed', String(on));
+    $('bg-toggle').textContent = on ? 'On' : 'Off';
+    if (run && mode === 'play') fillCreatures();   // takes effect at once: off removes the background items, on brings them back
+  });
   $('dense-toggle').addEventListener('click', function () {
     var on = !denseOn();
     try { localStorage.setItem('fish_dense', on ? 'on' : 'off'); } catch (e) { /* private mode */ }
@@ -2108,7 +2270,9 @@
       run.npcs.push(f);
       testFish = f;
     },
-    debugSetSize: function (s) { if (run && mode === 'play') { run.size = s; checkGrowth(); } },
+    // Test hooks. debugSetSize skips the calm, so a check can set any size; debugGrow goes through the calm rules.
+    debugSetSize: function (s) { if (run && mode === 'play') { run.size = s; while (run && mode === 'play' && run.info.n < 20 && run.size >= run.goal) { run.calmT = 0; checkGrowth(); } } },
+    debugGrow: function (s) { if (run && mode === 'play') { run.size = s; checkGrowth(); } },
     loopErrors: function () { return errorLog.slice(); },
     bedAt: function (x) { return run ? bedY(x) : null; },
     surfAt: function (x) { return run ? surfY(x) : null; },
@@ -2124,7 +2288,10 @@
         px: run ? run.x : null, py: run ? run.y : null, W: run ? run.info.W : null, hidden: run ? !!run.hidden : null,
         anemones: run && run.anemones ? run.anemones : null,
         belowBed: run ? Math.max.apply(null, [-9999].concat(run.npcs.filter(function (o) { return !o.dead; }).map(function (o) { return o.y - bedY(o.x); }))) : null,
-        air: run ? !!run.air : null, flora: run && run.flora ? run.flora.length : null, bedNear: run ? Math.round(bedY(run.x)) : null,
+        air: run ? !!run.air : null, flora: run && run.flora ? run.flora.filter(function (f) { return !f.forest; }).length : null,
+        forests: run && run.flora ? run.flora.filter(function (f) { return f.forest; }).length : null,
+        calm: run ? +(run.calmT || 0).toFixed(2) : null, bedNear: run ? Math.round(bedY(run.x)) : null,
+        morphing: run ? run.npcs.filter(function (o) { return o.morph && !o.dead; }).length : null,
         allies: run ? run.npcs.filter(function (o) { return o.ally && !o.dead; }).length : 0,
         allyCost: run ? run.npcs.filter(function (o) { return o.ally && !o.dead; }).length + 1 : null,
         locks: run ? run.lockedCount : 0, lives: run && run.lives,
@@ -2147,7 +2314,16 @@
         creatures: run ? { trash: run.npcs.filter(function (o) { return !o.dead && o.sp.trash; }).length,
           turtle: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'turtle'; }).length,
           crab: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'crab'; }).length,
-          moon: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'moon'; }).length } : null
+          moon: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'moon'; }).length,
+          bg: run.npcs.filter(function (o) { return !o.dead && o.sp.bg; }).length,   // v0.12 background items (all kinds)
+          clam: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'clam'; }).length,
+          rock: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'rock'; }).length,
+          boat: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'boat'; }).length,
+          sub: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'sub'; }).length,
+          urchin: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'urchin'; }).length,
+          shrimp: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'shrimp'; }).length,
+          squid: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'squid'; }).length,
+          lionsmane: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'lionsmane'; }).length } : null
       };
     }
   };

@@ -127,7 +127,8 @@ async function allies(browser, url) {
 async function fights(browser, url) {
   const ctx = await startRun(browser, url, 12, 1024, 768);
   const p = ctx.page;
-  await p.waitForTimeout(3000);   // you start with 2.5 s of invulnerability; wait it out so the fish's bites count
+  // The start (and each level-up) gives 5 s of calm and invulnerability (v0.12): wait it out so the fish's bites count.
+  await p.waitForTimeout(6000);
   const before = await p.evaluate(function () { return window.FishGame.state(); });
   await p.evaluate(function () { window.FishGame.debugSpawnBeside(20); });   // bigger than you (size 12)
   // The current carries you off, so keep you beside the test fish for a few seconds.
@@ -203,6 +204,128 @@ async function density(browser, url) {
   check('denser sea is on by default: about four times the fish at level 1', on.fish >= 80, 'fish with denser sea on=' + on.fish + ', off=' + off.fish);
   check('turning denser sea off gives the sparse count', off.fish <= 40 && off.fish >= 10, 'fish with it off=' + off.fish);
   check('no page errors (density)', on.errors.length === 0 && off.errors.length === 0, on.errors.concat(off.errors).join(' | '));
+}
+
+// v0.12: a level-up starts a calm, and only one level comes per calm. Growth past the goal waits for the calm to end.
+async function calmLevels(browser, url) {
+  const ctx = await startRun(browser, url, 70, 1024, 768);   // level 6; the start sets a calm, so wait it out
+  const p = ctx.page;
+  await p.waitForTimeout(5500);
+  const a = await p.evaluate(function () { return window.FishGame.state(); });
+  await p.evaluate(function () { window.FishGame.debugGrow(1000); });   // far past the goal: one level, then the calm
+  await p.waitForTimeout(200);
+  const b = await p.evaluate(function () { return window.FishGame.state(); });
+  await p.evaluate(function () { window.FishGame.debugGrow(1000); });   // straight away: must wait for the calm
+  await p.waitForTimeout(200);
+  const c = await p.evaluate(function () { return window.FishGame.state(); });
+  check('a level-up starts a calm, and no second level comes during it',
+    b.level === a.level + 1 && c.level === b.level && b.calm > 3 && b.calm <= 5,
+    'level ' + a.level + ' -> ' + b.level + ' -> ' + c.level + ', calm ' + b.calm);
+  await p.waitForTimeout(5500);
+  const d = await p.evaluate(function () { return window.FishGame.state(); });
+  check('when the calm ends, the next level comes once (not several at once)',
+    d.level === b.level + 1 && d.calm > 0, 'level ' + b.level + ' -> ' + d.level + ' after the calm, calm now ' + d.calm);
+  check('no page errors (calm levels)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
+// v0.12: your school changes form over a few seconds (a cross-fade), not all at once.
+async function schoolForms(browser, url) {
+  const ctx = await startRun(browser, url, 0, 1024, 768);
+  const p = ctx.page;
+  await p.evaluate(function () { window.FishGame.debugSetSize(95); });   // level 11: the school joins you
+  await p.waitForTimeout(6000);                                          // the calm, and the school arrives
+  const pods = await p.evaluate(function () { return window.FishGame.state(); });
+  await p.evaluate(function () { window.FishGame.debugSetSize(1000); }); // a new form on each level up, to level 20
+  await p.waitForTimeout(300);
+  const early = await p.evaluate(function () { return window.FishGame.state(); });
+  await p.waitForTimeout(2000);
+  const mid = await p.evaluate(function () { return window.FishGame.state(); });
+  await p.waitForTimeout(8000);
+  const late = await p.evaluate(function () { return window.FishGame.state(); });
+  check('your school changes form over a few seconds, then settles',
+    pods.pods >= 1 && early.morphing >= 1 && mid.morphing >= 1 && late.morphing === 0,
+    'school ' + pods.pods + ', changing at 0.3 s: ' + early.morphing + ', at 2.3 s: ' + mid.morphing + ', at 10 s: ' + late.morphing);
+  check('no page errors (school forms)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
+// v0.12: a harmless creature is not food. You touch a turtle for four seconds and it is still there, unhurt.
+async function harmlessIsNotFood(browser, url) {
+  const ctx = await startRun(browser, url, 12, 1024, 768);
+  const p = ctx.page;
+  await p.waitForTimeout(6000);   // the calm after the start
+  await p.evaluate(function () { window.FishGame.debugSpawnCreature('turtle'); });
+  const start = await p.evaluate(function () { return window.FishGame.state().testCreature; });
+  for (let i = 0; i < 16; i++) {
+    await p.evaluate(function () {
+      const s = window.FishGame.state();
+      if (s.testCreature && !s.testCreature.dead) window.FishGame.debugMove(s.testCreature.x - 30, s.testCreature.y);
+    });
+    await p.waitForTimeout(250);
+  }
+  const t = await p.evaluate(function () { return window.FishGame.state().testCreature; });
+  check('a turtle is not food: you touch it and it is still there, unhurt',
+    !!t && !t.dead && !!start && t.hp >= start.hp,
+    'turtle hp ' + (start && start.hp) + ' -> ' + (t && t.hp) + ', dead=' + (t && t.dead));
+  check('no page errors (harmless)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
+// v0.12 background items (Settings → Background items): clams, rocks, boats, a kelp forest, shrimp and urchins.
+// Off removes them at once; on brings them back. The mini map is bigger on a tablet than on a phone.
+async function backgroundItems(browser, url) {
+  // Level 8 (size 70): scenery. A level-up pauses new spawns for its calm (5 s), so poll for up to 15 s.
+  const ctx = await startRun(browser, url, 70, 1024, 768);
+  const p = ctx.page;
+  let st = null;
+  for (let i = 0; i < 30; i++) {
+    await p.waitForTimeout(500);
+    st = await p.evaluate(function () { return window.FishGame.state(); });
+    if (st.creatures.clam >= 1 && st.creatures.rock >= 1 && st.creatures.boat >= 1 && st.forests >= 2) break;
+  }
+  check('clams, rocks, boats and a kelp forest are in the sea by default',
+    st.creatures.clam >= 1 && st.creatures.rock >= 1 && st.creatures.boat >= 1 && st.forests >= 2,
+    'level ' + st.level + ': clams=' + st.creatures.clam + ' rocks=' + st.creatures.rock + ' boats=' + st.creatures.boat + ' forests=' + st.forests);
+
+  // Shrimp and urchins are edible prey from the early levels (their tier is 2), so check them on a fresh level-3 run.
+  const food = await startRun(browser, url, 25, 1024, 768);   // level 3
+  let fst = null;
+  for (let i = 0; i < 40; i++) {
+    await food.page.waitForTimeout(500);
+    fst = await food.page.evaluate(function () { return window.FishGame.state(); });
+    if (fst.creatures.shrimp >= 1 && fst.creatures.urchin >= 1) break;
+  }
+  check('shrimp and purple urchins come into the sea at level 3',
+    fst.creatures.shrimp >= 1 && fst.creatures.urchin >= 1, 'level ' + fst.level + ': shrimp=' + fst.creatures.shrimp + ' urchins=' + fst.creatures.urchin);
+  await food.page.close();
+
+  await p.click('#gear');
+  await p.waitForTimeout(300);
+  await p.evaluate(function () { document.querySelectorAll('#panel details').forEach(function (d) { d.open = true; }); });
+  await p.click('#bg-toggle');
+  await p.waitForTimeout(800);
+  const off = await p.evaluate(function () { return window.FishGame.state(); });
+  check('turning background items off clears them and the kelp forests',
+    off.creatures.bg === 0 && off.forests === 0, 'bg=' + off.creatures.bg + ' forests=' + off.forests);
+  await p.click('#bg-toggle');
+  await p.waitForTimeout(800);
+  const on = await p.evaluate(function () { return window.FishGame.state(); });
+  check('turning background items back on brings them back',
+    on.creatures.bg >= 1 && on.forests >= 2, 'bg=' + on.creatures.bg + ' forests=' + on.forests);
+  await p.click('#gear');
+  await p.waitForTimeout(200);
+  check('no page errors (background items)', ctx.errors.length === 0, ctx.errors.join(' | '));
+
+  await p.setViewportSize({ width: 768, height: 1024 });
+  await p.waitForTimeout(300);
+  const tablet = await p.evaluate(function () { return document.getElementById('minimap').getBoundingClientRect().width; });
+  await p.setViewportSize({ width: 390, height: 844 });
+  await p.waitForTimeout(300);
+  const phone = await p.evaluate(function () { return document.getElementById('minimap').getBoundingClientRect().width; });
+  check('the mini map is bigger on a tablet (440 px wide; 170 on a phone)',
+    Math.round(tablet) === 440 && Math.round(phone) === 170, 'tablet ' + Math.round(tablet) + ' px, phone ' + Math.round(phone) + ' px');
+  await p.close();
 }
 
 // Creatures (v0.11): turtles, crabs, jellyfish and gulls live in the sea. Jellyfish sting, crabs stay on the bed.
@@ -438,8 +561,12 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'allystay') await allyStay(browser, url);
     if (which === 'all' || which === 'settings') await settingsPanel(browser, url);
     if (which === 'all' || which === 'calm') await calm(browser, url);
+    if (which === 'all' || which === 'calmlevels') await calmLevels(browser, url);
+    if (which === 'all' || which === 'schoolforms') await schoolForms(browser, url);
+    if (which === 'all' || which === 'harmless') await harmlessIsNotFood(browser, url);
+    if (which === 'all' || which === 'background') await backgroundItems(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {

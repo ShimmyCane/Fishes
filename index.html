@@ -16,7 +16,7 @@
   <canvas id="view" aria-label="The sea. Swim with your finger."></canvas>
 
   <!-- HUD (play only) -->
-  <canvas id="minimap" class="minimap" width="170" height="68" aria-hidden="true"></canvas>
+  <canvas id="minimap" class="minimap" width="510" height="204" aria-hidden="true"></canvas>
   <header id="hud" class="hud">
     <div class="hud-card">
       <p id="hud-level" class="hud-level">Level 1</p>
@@ -139,6 +139,23 @@
           <span>Controls</span>
           <button id="control-toggle" class="toggle" aria-pressed="false">Tap and move</button>
         </div>
+      </details>
+
+      <details class="fold" id="bg-fold">
+        <summary><span>Background items</span></summary>
+        <div class="row">
+          <span>More background items in the sea</span>
+          <button id="bg-toggle" class="toggle" aria-pressed="true">On</button>
+        </div>
+        <p class="muted">None of these chase you. What they are:</p>
+        <ul class="muted bg-list">
+          <li><b>Scenery, not food:</b> clams in the sand, rocks on the bed, a rowing boat on the surface and a submarine drifting by. You swim past them.</li>
+          <li><b>Lion's mane jellyfish:</b> big floating bells that sting you on contact (2 health). Not food.</li>
+          <li><b>Edible:</b> shrimp, and squid (they jet off with a puff of ink, but you can catch them).</li>
+          <li><b>Sea urchins:</b> spiny. Eating one costs you 2 size in spines. The purple one comes early; the long-spined one comes later.</li>
+          <li><b>Kelp forest:</b> tall, thick seaweed. Small fish gather in it.</li>
+        </ul>
+        <p class="muted">Off removes them at once. The fish, the difficulty and the trash setting do not change.</p>
       </details>
 
       <details class="fold note-box">
