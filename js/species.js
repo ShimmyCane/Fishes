@@ -322,7 +322,8 @@
   // "Predator" = a non-docile fish at least 1.1x your size (it can eat you).
   // "Prey" = a fish you can eat (at most 0.87x your size).
   var DIFFICULTY = {
-    easy:   { label: 'Easy',   ratio: '1 predator : 4 prey', share: 0.2 },
+    // v0.12: Easy runs 5 minutes (limit, in seconds); the others keep the 15-minute cap.
+    easy:   { label: 'Easy',   ratio: '1 predator : 4 prey', share: 0.2, limit: 300 },
     medium: { label: 'Medium', ratio: '1 predator : 2 prey', share: 1 / 3 },
     hard:   { label: 'Hard',   ratio: '1 predator : 1 prey', share: 0.5 },
     // v0.11: no predators, and nothing can hurt you. Play without any stress.
@@ -363,7 +364,7 @@
   }
 
   var CONFIG = {
-    VERSION: '0.10',                    // see CHANGELOG.md
+    VERSION: '0.11',                    // see CHANGELOG.md
     VERSION_DATE: '2026-11-07',
     TIME_LIMIT: 900,                    // hard stop at 15 minutes
     LIVES: 3,

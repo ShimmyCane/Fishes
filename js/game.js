@@ -953,7 +953,7 @@
   // A fish's fighting value, attack times the bites it can still take. Allies use it to pick fights they can win.
   function fightPower(o) { return atkOf(o.size) * Math.max(1, o.hp); }
   function isThreat(o, P) { return canHurt(o.sp) && o.size >= P * 1.1; }
-  function isEdible(o, P) { return o.sp.kind !== 'harmless' && o.sp.kind !== 'food' && o.size <= P * 0.87; }
+  function isEdible(o, P) { return o.sp.kind !== 'harmless' && o.sp.kind !== 'food' && o.size <= P * 0.87 && o.size >= P * EDIBLE_MIN; }
 
   // Fish by tier relative to you: below (prey side), same, above (predator side).
   function spread() {
@@ -1008,6 +1008,7 @@
 
   function pickRole(c) {
     if (c.harmless < 1 + Math.floor(run.info.n / 3) && Math.random() < 0.08) return 'harmless';
+    if (threatShare() <= 0) return 'edible';   // v0.12: Calm has no predators. Without this, an empty food count picked a threat.
     var total = c.threat + c.edible;
     return (total === 0 || c.threat / total < threatShare()) ? 'threat' : 'edible';
   }
@@ -1111,7 +1112,8 @@
   }
 
   // ---------- player ----------
-  function speedFor(size) { return 200 * clamp(1.15 - 0.0045 * size, 0.62, 1.15); }
+  // v0.12: your base speed no longer falls as you grow. It rises 3% a level (see updatePlayer), so level 15 to 20 is faster.
+  function speedFor() { return 200 * 1.15; }
 
   function toWorld(sx, sy) {
     return { x: cam.x + (sx - CW / 2) / cam.scale, y: cam.y + (sy - CH / 2) / cam.scale };
@@ -1414,6 +1416,8 @@
     showBanner('Ouch!', r.lives + (r.lives === 1 ? ' life' : ' lives') + ' left. Swim on!', 2200);
   }
 
+  // v0.12: you eat plankton, krill and chum only up to level 4 (the start food). A fish under half your size is not food.
+  var FOOD_LAST_LEVEL = 4, EDIBLE_MIN = 0.5;
   function checkContact(n) {
     var r = run, sp = n.sp;
     if (n.pod) return;          // your school neither hurts you nor is eaten by you
@@ -1422,7 +1426,7 @@
     var reach = (lenFor(r.size, 'round') + lenFor(n.size, sp.shape)) * 0.36;
     if (d > reach) return;
     if (sp.kind === 'food') {   // plankton and chum bits go in one go; they also start the bite timer
-      if (r.size >= n.size * 1.15) { r.biteT = Math.max(r.biteT, BITE_S); eatNPC(n); }
+      if (r.info.n <= FOOD_LAST_LEVEL && r.size >= n.size * 1.15) { r.biteT = Math.max(r.biteT, BITE_S); eatNPC(n); }
       return;
     }
     // v0.11: a jellyfish stings you on contact, every 1.5 s, and cannot be eaten. Hidden under an anemone, you are safe.
@@ -1439,7 +1443,7 @@
       hurt(n, atkOf(n.size));
       if (mode !== 'play' || run !== r) return;   // you may have lost a life (the fish is then reset)
     }
-    if (r.biteT <= 0) {
+    if (r.biteT <= 0 && n.size >= r.size * EDIBLE_MIN) {   // v0.12: you do not bite fish under half your size
       r.biteT = BITE_S;
       r.lastBit = n;   // v0.11: the target your allies join when you use Attack
       n.hp -= atkOf(r.size);
@@ -1476,7 +1480,7 @@
       FishSound.play('lose');
     } else {
       title = "Time's up";
-      text = 'Fifteen minutes in the sea. You reached level ' + r.level + ' (' + r.info.name + ').';
+      text = 'Time is up in the sea. You reached level ' + r.level + ' (' + r.info.name + ').';
       FishSound.play('lose');
     }
     text += ' Score ' + score + '. Best ' + best + '.';
@@ -1489,7 +1493,8 @@
     r.tension = clamp((r.t - CFG.TENSION.start) / (CFG.TENSION.full - CFG.TENSION.start), 0, 1);
     r.bgT = Math.min(1, (r.bgT || 0) + dt / 2);
     r.calmT = Math.max(0, (r.calmT || 0) - dt);   // v0.12: the calm after a level-up
-    if (r.t >= CFG.TIME_LIMIT && r.info.n < 20) { endRun('time'); return; }   // endless after level 20: no time cap
+    var limit = (D.DIFFICULTY[r.difficulty] && D.DIFFICULTY[r.difficulty].limit) || CFG.TIME_LIMIT;   // v0.12: Easy is 5 minutes
+    if (r.t >= limit && r.info.n < 20) { endRun('time'); return; }   // endless after level 20: no time cap
 
     updatePlayer(dt);
 
@@ -1730,7 +1735,7 @@
       if (e.isPlayer || e.sp.kind === 'food' || e.sp.kind === 'harmless') return;
       // Readable at a glance: coral = can hurt you, mint = you can eat it.
       var danger = canHurt(e.sp) && e.size >= run.size * 1.1;
-      var edible = !danger && run.size >= e.size * 1.15;
+      var edible = !danger && run.size >= e.size * 1.15 && e.size >= run.size * EDIBLE_MIN;
       if (!danger && !edible) return;
       ctx.fillStyle = danger ? '#ff7a6b' : '#7fd8a8';
       ctx.beginPath();

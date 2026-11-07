@@ -206,6 +206,31 @@ async function density(browser, url) {
   check('no page errors (density)', on.errors.length === 0 && off.errors.length === 0, on.errors.concat(off.errors).join(' | '));
 }
 
+// v0.12 eating: plankton is food only up to level 4, and a fish under half your size is not food for you.
+async function edibleRules(browser, url) {
+  const ctx = await startRun(browser, url, 70, 1024, 768);   // level 8
+  const p = ctx.page;
+  await p.waitForTimeout(6000);   // the calm after the level-up
+  await p.evaluate(function () { window.FishGame.debugSpawnCreature('plankton'); });
+  await p.evaluate(function () { const c = window.FishGame.state().testCreature; window.FishGame.debugMove(c.x, c.y); });
+  await p.waitForTimeout(800);
+  const food = await p.evaluate(function () { return window.FishGame.state(); });
+  check('plankton is not food at level 8', food.testCreature && !food.testCreature.dead,
+    'level ' + food.level + ', plankton dead=' + (food.testCreature && food.testCreature.dead));
+  // A guppy (0.8) is far under half of your 70: you touch it for four seconds and it is not bitten.
+  await p.evaluate(function () { window.FishGame.debugSpawnCreature('guppy'); });
+  const start = await p.evaluate(function () { return window.FishGame.state().testCreature; });
+  for (let i = 0; i < 16; i++) {
+    await p.evaluate(function () { const c = window.FishGame.state().testCreature; if (c && !c.dead) window.FishGame.debugMove(c.x, c.y); });
+    await p.waitForTimeout(250);
+  }
+  const small = await p.evaluate(function () { return window.FishGame.state().testCreature; });
+  check('a baby fish under half your size is not food for you', !!small && !small.dead && !!start && small.hp >= start.hp,
+    'guppy hp ' + (start && start.hp) + ' -> ' + (small && small.hp) + ', dead=' + (small && small.dead));
+  check('no page errors (edible rules)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
 // v0.12 friends and followers: a similar fish that stays just outside your bite range for 3 s joins you.
 // Touching it resets the wait. Followers over the limit (2 x your size) are released one at a time.
 async function friendsAndFollowers(browser, url) {
@@ -623,8 +648,9 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'harmless') await harmlessIsNotFood(browser, url);
     if (which === 'all' || which === 'background') await backgroundItems(browser, url);
     if (which === 'all' || which === 'friends') await friendsAndFollowers(browser, url);
+    if (which === 'all' || which === 'edible') await edibleRules(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {
