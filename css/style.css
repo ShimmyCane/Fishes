@@ -162,6 +162,11 @@ html, body {
 .sprint-text { font-size: 0.95em; }
 .stam { display: none; }
 
+/* Tablets (v0.11): the action buttons are about twice as wide, so they are easy to hit on an iPad. */
+@media (min-width: 700px) and (min-height: 600px) {
+  .ally, .attack, .sprint { width: 16em; }
+}
+
 /* Attack button (v0.11): your allies join the fight you are in. Between Ally and Sprint. */
 .attack {
   width: 8em;
@@ -506,8 +511,12 @@ textarea {
 
 /* Mini map (v0.11): the whole wrapping sea, play only. Its size matches the canvas attributes. */
 .minimap {
-  position: fixed; left: 12px; top: 124px; width: 170px; height: 68px;
+  position: fixed; right: 12px; top: 124px; width: 170px; height: 68px;   /* v0.11: top right, out of the way of the bigger buttons */
   border: var(--line); border-radius: 12px; background: #e9fbf5; z-index: 4; pointer-events: none;
 }
 body[data-mode="title"] .minimap,
 body[data-mode="over"] .minimap { display: none; }
+/* Short landscape screens: a smaller mini map, kept top left where there is room beside the HUD. */
+@media (max-height: 500px) {
+  .minimap { left: 12px; right: auto; width: 120px; height: 48px; top: 124px; }
+}

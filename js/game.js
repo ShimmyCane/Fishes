@@ -1557,7 +1557,7 @@
   function updateCamera(dt) {
     var r = run;
     var phone = Math.min(CW, CH) < 600 ? 2.5 : 1;   // phones: everything in play is 2.5x larger
-    var ZOOM = 4;                                    // v0.10: the whole world is drawn 4x larger; the camera follows the fish
+    var ZOOM = 3;                                    // v0.11: the whole world is drawn 3x larger (was 4x: zoomed out 25%); the camera follows the fish
     var t = clamp((r.info.n - 1) / 19, 0, 1);        // 0 at level 1, 1 at level 20
     // At level 1 the view is 930 x 578 (900 + 10 x 3, 560 + 6 x 3, the start size); the scale there is the base.
     var base = Math.min(CW / 930, CH / 578) * phone * ZOOM;
