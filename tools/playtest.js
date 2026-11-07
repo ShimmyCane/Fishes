@@ -68,7 +68,7 @@ async function layout(browser, url) {
   for (const [w, h] of sizes) {
     const ctx = await startRun(browser, url, 0, w, h, 'joystick');
     const rects = await ctx.page.evaluate(function () {
-      return ['joy', 'ally', 'attack', 'sprint', 'gear', 'hud'].map(function (id) {
+      return ['joy', 'ally', 'attack', 'sprint', 'gear', 'hud', 'minimap'].map(function (id) {
         const e = id === 'hud' ? document.querySelector('.hud') : document.getElementById(id);
         const b = e.getBoundingClientRect();
         return { id: id, l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width };

@@ -2,6 +2,11 @@
 
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
+## 0.11 — unreleased
+- The whole world is drawn 25% smaller, so the fish is less large on screen. You see a little more of the sea.
+- On tablets (screens at least 700 px wide and 600 px tall), the Ally, Attack and Sprint buttons are about twice as wide, so they are easier to hit on an iPad.
+- The mini map is in the top right. On short landscape screens it stays top left, beside the top bar, so the buttons keep clear of it.
+
 ## 0.10 — 2026-11-07
 - Pacing: levels 1 to 5 need three times the growth they did (level 1 ends at size 12, not 6), so there is more food to find before you move on. Later levels need 13% less, and the largest fish is still about 300. Each meal gives the same growth as before.
 - Your allies heal after four seconds without a hit (a third of their health a second), and eating food heals them a little.
