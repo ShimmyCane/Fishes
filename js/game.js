@@ -617,7 +617,8 @@
   function buyAlly() {
     if (!run || mode !== 'play' || paused) return;
     var cost = allyCost();
-    if (run.size - cost < 1) { floatText(run.x, run.y, 'Need ' + cost + ' EXP'); return; }
+    // v0.11: EXP is size. Buying spends the growth of this level, never the levels you have already reached.
+    if (run.size - cost < run.info.enterSize) { floatText(run.x, run.y, 'Not enough EXP left on this level'); return; }
     run.size -= cost;
     run.allySpent = (run.allySpent || 0) + cost;   // test hook: what buys have charged in total
     spawnPod(true);
@@ -625,11 +626,37 @@
     FishSound.play('eat');
   }
 
+  // v0.11: allies heal like you do. Four seconds without a hit, then they regain a third of their health a second.
+  // Eating food heals an ally by 1 at once.
+  function healAlly(n, amount) { n.hp = Math.min(n.maxHp, n.hp + amount); }
+  // v0.11 Attack: for 8 seconds your allies go for the fish you last bit (or the nearest fish near you), and
+  // stop running from bigger ones. Ready again after 20 seconds.
+  var CMD_S = 8, CMD_COOL = 20;
+  function commandAllies() {
+    if (!run || mode !== 'play' || paused) return;
+    if (liveAllies() === 0) { floatText(run.x, run.y, 'No allies'); return; }
+    if ((run.cmdCd || 0) > 0) { floatText(run.x, run.y, 'Ready in ' + Math.ceil(run.cmdCd) + 's'); return; }
+    var tgt = run.lastBit && !run.lastBit.dead && !run.lastBit.pod && distW(run.lastBit, run) < 400 ? run.lastBit : null;
+    if (!tgt) {
+      var best = 300;
+      run.npcs.forEach(function (o) {
+        if (o.ally || o.pod || o.dead || o.sp.kind === 'food' || o.sp.kind === 'harmless') return;
+        var d = distW(o, run);
+        if (d < best) { best = d; tgt = o; }
+      });
+    }
+    if (!tgt) { floatText(run.x, run.y, 'No target'); return; }
+    run.cmd = { target: tgt, t: CMD_S };
+    run.cmdCd = CMD_COOL;
+    floatText(tgt.x, tgt.y, 'Attack!');
+    FishSound.play('eat');
+  }
+
   // An ally's meal feeds you: half of what you would get from the same meal (v0.10).
   // Growth is checked after the NPC update, not here, so a level change cannot happen mid-loop.
   var ALLY_SHARE = 0.5;
   function allyCredit(meal) {
-    var r = run, span = Math.max(0.5, r.goal - r.info.enterSize), gain;
+    var r = run, span = Math.max(0.5, r.info.meal), gain;
     gain = meal.sp.kind === 'food' ? meal.size * 0.4 : Math.max(meal.size * 0.25, span / (r.info.n >= 20 ? 10 : 9));
     gain *= ALLY_SHARE;
     r.size += gain;
@@ -643,6 +670,11 @@
     n.biteT = Math.max(0, n.biteT - dt);
     n.size = Math.max(0.5, r.size * 0.5);                      // the pod grows as you grow
     n.hp = Math.min(n.hp, maxHpOf(n.size)); n.maxHp = maxHpOf(n.size);
+    if (n.ally) {   // v0.11: heal after a pause without a hit
+      if (n.lastHp !== undefined && n.hp < n.lastHp) n.quietT = 0; else n.quietT = (n.quietT || 0) + dt;
+      if (n.quietT > 4 && n.hp < n.maxHp) healAlly(n, n.maxHp / 3 * dt);
+      n.lastHp = n.hp;
+    }
     // Run from a predator four times its size (v0.8). An ally runs from any fish that could eat it (v0.10).
     // Otherwise attack: the nearest fish it can eat within 220 (only fish up to 0.6x its size, so the school is
     // not overpowering). Otherwise an ally eats the nearest chum or plankton. Otherwise keep station beside you.
@@ -654,6 +686,8 @@
     // The bites come from the fight loop in update(), so this only steers.
     var big = findNear(n, 260, function (o) { return !o.pod && canBite(o.sp) && fightPower(o) > fightPower(n); });
     var prey = big || away ? null : findNear(n, 220, function (o) { return !o.pod && o.sp.kind !== 'food' && fightPower(o) <= fightPower(n) && (!n.ally || nearYou(o)); });
+    var cmd = n.ally && r.cmd && !r.cmd.target.dead ? r.cmd.target : null;   // v0.11: Attack overrides running and foraging
+    if (cmd) { big = null; prey = cmd; }
     var food = big || prey || away || !n.ally ? null : findFeed(n, nearYou);
     var tx, ty, s;
     if (big) {
@@ -667,6 +701,7 @@
         food.dead = true;
         burst(food.x, food.y, food.sp.col || '#ffffff', 4);
         allyCredit(food);
+        healAlly(n, 1);
       }
     } else {
       tx = r.x + Math.cos(n.podA + n.t * 0.5) * 90; ty = r.y + Math.sin(n.podA + n.t * 0.5) * 90; s = 200;
@@ -927,7 +962,7 @@
 
   // Nearest fish this predator can eat (at least 1.25x smaller), within 240 units.
   function findPrey(n) {
-    var r = run, best = null, bd = 240;
+    var r = run, best = null, bd = 240 + 12 * r.info.n;   // v0.11: hunters look further on deeper levels
     for (var i = 0; i < r.npcs.length; i++) {
       var o = r.npcs[i];
       if (o === n || o.dead || o.sp.kind === 'food' || o.sp.kind === 'harmless') continue;
@@ -952,8 +987,16 @@
     var tx = null, ty = null, s = 0, k = 2.5;
 
     if (sp.kind === 'food') {
-      var fw = wander(n, 300);
-      tx = fw.x; ty = fw.y; s = speed * 0.5;
+      // v0.11: plankton and krill scatter from any other fish that swims close (you still catch them on contact).
+      var threatF = findNear(n, 170, function (o) { return o.sp.kind !== 'food' && o.sp.kind !== 'harmless' && !o.pod; });
+      if (threatF) {
+        var fx2 = dxW(n.x, threatF.x), fy2 = n.y - threatF.y;
+        var fl2 = Math.hypot(fx2, fy2) || 1;
+        tx = n.x + fx2 / fl2 * 300; ty = n.y + fy2 / fl2 * 300; s = speed * 1.6; k = 4;
+      } else {
+        var fw = wander(n, 300);
+        tx = fw.x; ty = fw.y; s = speed * 0.5;
+      }
     } else if (sp.kind === 'prey') {
       var fx = 0, fy = 0, threat = false, i, pr;
       if (!r.hidden && r.size >= n.size * 1.15 && dp < 320) { threat = true; fx -= dxp / dp; fy -= dyp / dp; }
@@ -1097,7 +1140,7 @@
       FishSound.play('hurt');
     } else {
       // A level takes about nine fish meals at most: each meal gives at least a ninth of the level's size range.
-      var span = Math.max(0.5, r.goal - r.info.enterSize);
+      var span = Math.max(0.5, r.info.meal);
       gain = n.sp.kind === 'food' ? n.size * 0.4 : Math.max(n.size * 0.25, span / (r.info.n >= 20 ? 10 : 9));   // level 20: ten meals (v0.9)
       r.size += gain;
       floatText(n.x, n.y, '+' + gain.toFixed(1));
@@ -1164,6 +1207,7 @@
     }
     if (r.biteT <= 0) {
       r.biteT = BITE_S;
+      r.lastBit = n;   // v0.11: the target your allies join when you use Attack
       n.hp -= atkOf(r.size);
       burst(n.x, n.y, '#d9473a', 5);
       schoolDefend(n, null);
@@ -1216,6 +1260,8 @@
 
     updatePods();
     updateBirds(dt);
+    if (r.cmd) { r.cmd.t -= dt; if (r.cmd.t <= 0 || r.cmd.target.dead) r.cmd = null; }
+    if (r.cmdCd > 0) r.cmdCd = Math.max(0, r.cmdCd - dt);
     r.spawnT = (r.spawnT || 0) - dt;
     if (r.spawnT <= 0) { r.spawnT = 1.2; fillPopulations(false); }
 
@@ -1236,9 +1282,15 @@
       if (eater.dead || eater.biteT > 0 || !canBite(eater.sp)) continue;
       for (var j = 0; j < r.npcs.length; j++) {
         var meal = r.npcs[j];
-        if (meal === eater || meal.dead || meal.sp.kind === 'food' || meal.sp === eater.sp) continue;
+        if (meal === eater || meal.dead || meal.sp === eater.sp) continue;
         var md = distW(eater, meal);
         if (md < (lenFor(eater.size, eater.sp.shape) + lenFor(meal.size, meal.sp.shape)) * 0.36) {
+          if (meal.sp.kind === 'food') {   // v0.11: small fish eat plankton and chum they touch
+            meal.dead = true; eater.biteT = Math.max(eater.biteT, 0.3); r.fedFish = (r.fedFish || 0) + 1;
+            burst(meal.x, meal.y, meal.sp.col || '#ffffff', 3);
+            if (eater.ally) healAlly(eater, 1);
+            break;
+          }
           eater.biteT = STRIKE_S;
           meal.hp -= atkOf(eater.size);
           burst(meal.x, meal.y, '#d9473a', 4);
@@ -1425,6 +1477,10 @@
       var shape = e.isPlayer ? e.desc.shape : e.sp.shape;
       var len = lenFor(e.size, shape);
       if (healthBarsOn() && e.maxHp > 1) drawHealthBar(e, len);
+      if (e.ally && !e.isPlayer) {   // v0.11: a dashed teal ring marks your bought allies, apart from the school
+        ctx.save(); ctx.strokeStyle = '#5fd0c0'; ctx.lineWidth = 2 / cam.scale; ctx.setLineDash([6 / cam.scale, 5 / cam.scale]);
+        ctx.beginPath(); ctx.arc(e.x, e.y, len * 0.6, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+      }
       if (e.isPlayer || e.sp.kind === 'food' || e.sp.kind === 'harmless') return;
       // Readable at a glance: coral = can hurt you, mint = you can eat it.
       var danger = canHurt(e.sp) && e.size >= run.size * 1.1;
@@ -1527,7 +1583,7 @@
   function updateHUD() {
     var r = run;
     if (!r) return;
-    var span = Math.max(1, r.goal - r.info.enterSize);
+    var span = Math.max(1, r.info.goal - r.info.enterSize);
     var pct = clamp((r.size - r.info.enterSize) / span, 0, 1);
     $('hud-level').textContent = 'Level ' + r.level + ' · ' + r.info.name;
     $('hud-zone').textContent = r.info.zone.name + ' · ' + D.DIFFICULTY[r.difficulty].label;
@@ -1536,6 +1592,7 @@
       ? 'Score ' + scoreOf(r) + ' · Size ' + r.size.toFixed(1)
       : 'Size ' + r.size.toFixed(1) + ' / ' + Math.round(r.goal);
     $('ally-cost').textContent = allyCost();
+    $('attack-text').textContent = (r.cmdCd || 0) > 0 ? 'Ready in ' + Math.ceil(r.cmdCd) + 's' : 'Attack';
     $('hud-lives').textContent = '❤️'.repeat(r.lives) || '—';
     $('hud-time').textContent = mmss(r.t) + ' / 15:00';
     $('sprint').style.setProperty('--stam', Math.round(r.stamina) + '%');
@@ -1600,7 +1657,7 @@
       x: 0, y: 0, vx: 0, vy: 0, facing: 1,
       stamina: 100, sprintCd: 0, sprinting: false, inv: 2.5,
       npcs: [], parts: [], spawnT: 0, bannerT: 0, lockedCount: 0, score: 0,
-      difficulty: getDifficulty(), form: D.leadOf(1), npcEaten: 0, hitBy: '', goal: 2, packSeq: 0,
+      difficulty: getDifficulty(), form: D.leadOf(1), npcEaten: 0, hitBy: '', goal: D.levelInfo(1).goal, packSeq: 0,
       zoneFrom: null, zoneOld: null, bgT: 1,
       hp: playerMaxHp(D.START_SIZE), maxHp: playerMaxHp(D.START_SIZE), biteT: 0, quietT: 0, podSpawns: 0
     };
@@ -1767,6 +1824,7 @@
   // Buttons
   $('btn-play').addEventListener('click', startRun);
   $('ally').addEventListener('click', buyAlly);
+  $('attack').addEventListener('click', commandAllies);
   $('control-toggle').addEventListener('click', function () {
     control = control === 'tap' ? 'joystick' : 'tap';
     try { localStorage.setItem('fish_control', control); } catch (e) { /* private mode */ }
@@ -1936,6 +1994,8 @@
     debugMove: function (x, y) { if (run && mode === 'play') { run.x = wrapX(x); run.y = y; cam.x = run.x; cam.y = y; } },
     // Test hooks (v0.10): kill every living ally, to check the price falls back; read the ally count and price.
     debugKillAllies: function () { if (run) run.npcs.forEach(function (o) { if (o.ally) o.dead = true; }); },
+    // Test hook (v0.11): take health from every living ally, to check that they heal.
+    debugHurtAllies: function (d) { if (run) run.npcs.forEach(function (o) { if (o.ally && !o.dead) o.hp = Math.max(0.1, o.hp - d); }); },
     state: function () {
       return {
         mode: mode, level: run && run.level, size: run && run.size, npcs: run ? run.npcs.length : 0,
@@ -1956,6 +2016,10 @@
         player: run && { x: run.x, y: run.y }, cam: { x: cam.x, y: cam.y, scale: cam.scale },
         hunters: run ? run.npcs.filter(function (o) { return o.sp.kind === 'hunter'; }).map(function (o) { return { x: o.x, y: o.y, size: o.size, locked: o.locked }; }) : [],
         testFish: testFish ? { x: testFish.x, y: testFish.y, hp: testFish.hp, maxHp: testFish.maxHp, dead: !!testFish.dead } : null,
+        allyHp: run ? run.npcs.filter(function (o) { return o.ally && !o.dead; }).reduce(function (a, o) { return a + o.hp; }, 0) : null,
+        goal: run ? run.goal : null, fedFish: run ? run.fedFish || 0 : null,
+        command: run && run.cmd ? { t: run.cmd.t, target: !run.cmd.target.dead } : null,
+        commandCooldown: run ? run.cmdCd || 0 : null,
         testCreature: testCreature ? { x: testCreature.x, y: testCreature.y, hp: testCreature.hp, dead: !!testCreature.dead } : null,
         birds: run && run.birds ? run.birds.length : null,
         creatures: run ? { turtle: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'turtle'; }).length,

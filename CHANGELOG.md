@@ -3,6 +3,14 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.10 — unreleased
+- Pacing: levels 1 to 5 need three times the growth they did (level 1 ends at size 12, not 6), so there is more food to find before you move on. Later levels need 13% less, and the largest fish is still about 300. Each meal gives the same growth as before.
+- Your allies heal after four seconds without a hit (a third of their health a second), and eating food heals them a little.
+- New Attack button, between Ally and Sprint: for 8 seconds your allies go for the fish you last bit (or the nearest fish near you), and they stop running from bigger fish. Ready again after 20 seconds.
+- Allies are marked with a dashed teal ring. The school that joins you from level 10 has no ring, so the count of allies is the ones you bought.
+- Buying an ally can't take you below the start of your current level. The EXP you spend comes from the growth of this level.
+- Small fish eat the plankton and chum they touch. Plankton scatters from any fish that swims close.
+- Hunters look further on deeper levels.
+- Fixed: the first level's goal showed 2 until you levelled up.
 - New creatures, none of them hunt you:
   - Green sea turtles and rock crabs in the shallows. Crabs walk sideways along the seabed.
   - Moon jellyfish from level 3. They drift, and touching one stings you for a little health (every 1.5 s). You cannot eat them, so swim round them.
