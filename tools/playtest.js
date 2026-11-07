@@ -143,6 +143,29 @@ async function camera(browser, url) {
   await p.close();
 }
 
+// Density (v0.11): the bigger sea keeps the fish as dense as before by default, and the setting turns that off.
+async function density(browser, url) {
+  const fishAt = async function (dense) {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errors = [];
+    page.on('pageerror', function (e) { errors.push(e.message); });
+    if (dense === 'off') await page.addInitScript(function () { localStorage.setItem('fish_dense', 'off'); });
+    await page.goto(url);
+    await page.click('#btn-play');
+    await page.waitForTimeout(500);
+    const ctx = { page: page, errors: errors };
+    await ctx.page.evaluate(function () { window.FishGame.debugSetSize(3); });
+    await ctx.page.waitForTimeout(1500);
+    const st = await ctx.page.evaluate(function () { return window.FishGame.state(); });
+    await ctx.page.close();
+    return { fish: st.census.fish, errors: ctx.errors };
+  };
+  const on = await fishAt('on'), off = await fishAt('off');
+  check('denser sea is on by default: about four times the fish at level 1', on.fish >= 80, 'fish with denser sea on=' + on.fish + ', off=' + off.fish);
+  check('turning denser sea off gives the sparse count', off.fish <= 40 && off.fish >= 10, 'fish with it off=' + off.fish);
+  check('no page errors (density)', on.errors.length === 0 && off.errors.length === 0, on.errors.concat(off.errors).join(' | '));
+}
+
 async function smoke(browser, url, seconds) {
   const ctx = await startRun(browser, url, 12, 1024, 768, 'joystick');
   for (let i = 0; i < 3; i++) { await ctx.page.click('#ally'); await ctx.page.waitForTimeout(100); }
@@ -164,8 +187,9 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'layout') await layout(browser, url);
     if (which === 'all' || which === 'allies') await allies(browser, url);
     if (which === 'all' || which === 'camera') await camera(browser, url);
+    if (which === 'all' || which === 'density') await density(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'camera', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'camera', 'density', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {

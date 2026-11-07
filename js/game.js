@@ -704,20 +704,26 @@
     return (total === 0 || c.threat / total < threatShare()) ? 'threat' : 'edible';
   }
 
+  // v0.11: the sea is twice as big in each direction, so with the same fish it would be four times as empty.
+  // "Denser sea" (on by default) keeps the fish as dense as before the sea grew: four times the fish.
+  function denseOn() {
+    try { return localStorage.getItem('fish_dense') !== 'off'; } catch (e) { return true; }
+  }
   function fillPopulations(initial) {
     var r = run, n = r.info.n, counts = {}, i;
+    var dense = denseOn() ? 4 : 1;   // (3200 x 2000) / (1600 x 1000) = 4
     // Food first: plankton from tier 1, krill from tier 2.
     r.npcs.forEach(function (o) { if (!o.dead) counts[o.sp.id] = (counts[o.sp.id] || 0) + 1; });
     SPECIES.forEach(function (sp) {
       if (sp.kind !== 'food' || sp.tier > n) return;
-      var target = Math.round(sp.base * (1 + 0.05 * (n - 1)));
-      var add = Math.min(target - (counts[sp.id] || 0), initial ? target : 4);
+      var target = Math.round(sp.base * (1 + 0.05 * (n - 1)) * dense);
+      var add = Math.min(target - (counts[sp.id] || 0), initial ? target : 4 * dense);
       for (i = 0; i < add; i++) spawnNPC(sp, initial);
     });
     // Fish: a tier-sized population, split into threats and edible fish by the ratio.
     var c = census();
-    var need = Math.round(22 + 3 * n) - c.fish;
-    var budget = initial ? 999 : 2;
+    var need = Math.round((22 + 3 * n) * dense) - c.fish;
+    var budget = initial ? 999 : 2 * dense;
     while (need > 0 && budget > 0) {
       var role = pickRole(c), actual = role;
       var sp = pickSpecies(role, r.size);
@@ -1513,6 +1519,8 @@
     $('errors-toggle').textContent = showErrors ? 'On' : 'Off';
     $('hp-toggle').setAttribute('aria-pressed', String(healthBarsOn()));
     $('hp-toggle').textContent = healthBarsOn() ? 'On' : 'Off';
+    $('dense-toggle').setAttribute('aria-pressed', String(denseOn()));
+    $('dense-toggle').textContent = denseOn() ? 'On' : 'Off';
     refreshNotes();
     refreshDbStatus();
   }
@@ -1682,6 +1690,12 @@
     renderErrors();
   });
   $('note-save').addEventListener('click', saveNote);
+  $('dense-toggle').addEventListener('click', function () {
+    var on = !denseOn();
+    try { localStorage.setItem('fish_dense', on ? 'on' : 'off'); } catch (e) { /* private mode */ }
+    $('dense-toggle').setAttribute('aria-pressed', String(on));
+    $('dense-toggle').textContent = on ? 'On' : 'Off';
+  });
   $('hp-toggle').addEventListener('click', function () {
     var on = !healthBarsOn();
     try { localStorage.setItem('fish_healthbars', on ? 'on' : 'off'); } catch (e) { /* private mode */ }

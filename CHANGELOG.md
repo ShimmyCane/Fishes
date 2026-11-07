@@ -3,6 +3,7 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.10 — unreleased
+- Denser sea (on by default, Settings → Sound, errors, display and controls): the bigger sea has four times the fish, so it is as dense as before it grew. Turn it off for the sparser sea (and a little less work for the phone).
 - The sea is twice as big in each direction. The camera zooms out a little with each level as well as with your size, so you see more of the sea as you grow, and the fish still looks bigger on screen.
 - The seabed has hills, and the surface has waves. Both repeat exactly at the edge of the sea, so the left and right sides meet without a seam.
 - Swim up through the surface and you hop out into the sky, higher the bigger you are. You splash back down when you land.
