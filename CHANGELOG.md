@@ -2,7 +2,7 @@
 
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
-## 0.10 — unreleased
+## 0.10 — 2026-11-07
 - Pacing: levels 1 to 5 need three times the growth they did (level 1 ends at size 12, not 6), so there is more food to find before you move on. Later levels need 13% less, and the largest fish is still about 300. Each meal gives the same growth as before.
 - Your allies heal after four seconds without a hit (a third of their health a second), and eating food heals them a little.
 - New Attack button, between Ally and Sprint: for 8 seconds your allies go for the fish you last bit (or the nearest fish near you), and they stop running from bigger fish. Ready again after 20 seconds.

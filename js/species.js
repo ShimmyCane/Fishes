@@ -325,8 +325,8 @@
   }
 
   var CONFIG = {
-    VERSION: '0.9',                     // see CHANGELOG.md
-    VERSION_DATE: '2026-11-04',
+    VERSION: '0.10',                    // see CHANGELOG.md
+    VERSION_DATE: '2026-11-07',
     TIME_LIMIT: 900,                    // hard stop at 15 minutes
     LIVES: 3,
     TENSION: { start: 150, full: 300 }, // harder from 2:30, full by 5:00 (raises the predator share by up to 50%)
