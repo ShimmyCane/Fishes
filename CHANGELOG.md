@@ -3,6 +3,7 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.11 — unreleased
+- New difficulty: Calm (cannot be eaten). There are no predators, and nothing can hurt you, so you can play without any stress.
 - Settings → Trash in the sea: when on, socks, underwear, toy cars and plastic bottles drift in the sea. Touching one costs 2 health (every 1.5 s). You cannot eat them. Off removes them at once, for when the room is clean.
 - On tablets, the mini map is twice as big, the Attack, Ally and Sprint buttons are wider, and the settings button is bigger.
 - The enemy dots on the mini map are bigger, so the fish swimming round you are easier to see.

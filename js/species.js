@@ -299,7 +299,9 @@
   var DIFFICULTY = {
     easy:   { label: 'Easy',   ratio: '1 predator : 4 prey', share: 0.2 },
     medium: { label: 'Medium', ratio: '1 predator : 2 prey', share: 1 / 3 },
-    hard:   { label: 'Hard',   ratio: '1 predator : 1 prey', share: 0.5 }
+    hard:   { label: 'Hard',   ratio: '1 predator : 1 prey', share: 0.5 },
+    // v0.11: no predators, and nothing can hurt you. Play without any stress.
+    calm:   { label: 'Calm',   ratio: 'no predators, you cannot be eaten', share: 0, calm: true }
   };
 
   function zoneIndex(n) { return n <= 4 ? 0 : n <= 8 ? 1 : n <= 12 ? 2 : n <= 16 ? 3 : 4; }
