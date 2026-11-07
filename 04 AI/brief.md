@@ -38,12 +38,12 @@
   - Family panel: a wrong password is refused and shown on the page; the note is kept in the cookie and the status reads "needs family sign-in".
 - Live database checks (Supabase MCP, not the browser): rolled-back test returned `note_saved=t bad_row_rejected=t delete_denied=t anon_denied=t`; the real migration applied; RLS on; `anon` has no grants; `authenticated` has INSERT and SELECT.
 - **Not verified:** a successful family sign-in and a note landing in the table. The sandbox cannot reach `supabase.co` from the browser, so this must be done on the iPad by Jimmy.
-- Unverified: run length (8–15 minutes); balance of predator sizes per tier; iPad touch feel; how docile fish read on screen.
+- Unverified (as of 0.11): run length (8–15 minutes); balance of predator sizes per tier; iPad touch feel, including the wider buttons and the mini map in the top right; how docile fish read on screen; whether the teal ring on allies is clear; whether levels 1–5 (3× growth) feel slow enough.
 
 ## Next steps
 
 1. Jimmy signs in on the iPad (⚙️ → Family database) and saves a test note. Check it in the family table.
-2. Play one full run per difficulty; time it against 8–15 minutes and note unfair moments in ⚙️.
+2. Play one full run per difficulty; time it against 8–15 minutes and note unfair moments in ⚙️. (The 0.10 pacing changed the early levels, so time it again.)
 3. Tune: prey gain (0.4 of prey size), tier windows (currently 1–3 tiers), fish target (22 + 2×tier), threat cap (70%).
 4. Play-test the allies on an iPad: do they stay near you, is the price clear, is the EXP share fair (`ALLY_SHARE`), is the leash right (`LEASH`)?
 

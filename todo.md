@@ -1,5 +1,13 @@
 
 - [x] Round 5: each level at most about nine fish meals; your school from level 10 (v0.7)
-- [ ] Check the run length of a full game against 8–15 minutes (see convo v0.6)
-- [ ] Next milestone: graphics, distinct fish, ocean elements, smarter sea creatures (see 04 AI/brief.md and .claude/skills/fishes-sea-creatures)
-- [ ] Play-test allies on iPad: EXP share, leash distance, price clarity
+- [x] Release 0.10 (2026-11-07), and 0.11 changes merged to `main` ahead of its release (see CHANGELOG 0.11)
+- [ ] Check the run length of a full game against 8–15 minutes (see convo v0.6). Needs one timed full game on a device: the 0.10 pacing (levels 1–5 need 3× the growth) may have moved this.
+- [ ] Next milestone (see 04 AI/brief.md and .claude/skills/fishes-sea-creatures):
+  - [x] Other ocean elements: anemones and kelp doubled; currents; gulls, turtles, crabs and moon jellyfish (v0.11)
+  - [x] Smarter sea creatures: small fish eat plankton, plankton flees fish, hunters look further on deeper levels (v0.11)
+  - [ ] Graphics: depth light, bubbles, a richer seabed. Art direction needs your choice (two options each).
+  - [ ] Frame budget on older iPads: not measured on a device yet (headless: about 54–60 fps at level 18 with the denser sea).
+- [ ] Play-test allies on iPad: EXP share, leash distance, price clarity, the teal ring, heal and the Attack button
+- [ ] Play-test the 0.11 layout on iPad: buttons about twice as wide, mini map top right (short landscape screens keep it top left)
+- [ ] Family database: a successful sign-in and a saved note on the iPad (Jimmy). Not verified: the sandbox cannot reach supabase.co from the browser.
+- [ ] Playtest flake: one full run in the 0.10 release check had one failing check that was not captured. Find out which of the allies or Attack checks it is, and make it robust.
