@@ -42,7 +42,7 @@ Twenty tiers (one per level), in five depth zones. The play area grows with each
   - **docile** never attacks and never locks on. It flees bigger fish. (Guppy, herring, angelfish, sunfish.)
   - **wary** hunts smaller fish, ignores you when you are smaller, and flees when you are bigger. It does not lock on. (Dottyback, cleaner wrasse, sailfish, goblin shark.)
   - **aggressive** hunts smaller fish and locks on to you when you are smaller. (Bonito, barracuda, bluefin tuna, reef shark, great white, blue marlin.)
-- **Fish eat fish.** A non-docile fish at least 1.25× bigger eats a smaller fish it touches, plankton included. Docile fish are never eaten by the player's rule, but they can still be eaten by a bigger predator.
+- **Any fish can fight any fish (v0.10).** Two fish that touch fight, whatever their size. Each bites on its own timer for its attack value, and the one whose health runs out first is removed. Food and harmless fish never bite. Fish of the same species do not fight each other. The player still eats plankton, chum and smaller fish by the 1.15× rule; the lock-on and the hunters' chase still use size.
 
 | Tier | Zone | Size to leave | Species (temper) |
 |---|---|---|---|
@@ -95,7 +95,7 @@ Each species' real-fish note is in `js/species.js`.
 
 ## Combat, health and chum (v0.4)
 
-- **Bites:** a fish is removed when its health reaches zero. A bite takes off the attacker's attack value. The player bites every 0.6 s; fish bite every 0.9 s.
+- **Bites:** a fish is removed when its health reaches zero. A bite takes off the attacker's attack value. The player bites every 0.6 s; fish bite every 0.9 s. (v0.10: the player's bite pause is 1.0 s, and fish bite each other every 0.9 s.)
 - **Attack:** 1 + floor(size / 8). A size-1 fish does 1; a size-100 fish does 13.
 - **Health:** fish max(1, round(size / 3)). Small fish die in one bite; bigger fish take several.
 - **Your health:** 10 + floor(size / 2). Regenerates 3 per second after 4 seconds without a hit. Running out costs a life, as before.

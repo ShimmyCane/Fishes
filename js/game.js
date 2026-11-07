@@ -566,12 +566,10 @@
     var LEASH = 300;
     var nearYou = function (o) { return distW(o, r) < LEASH; };
     var away = n.ally && distW(n, r) > LEASH;
-    var big = findNear(n, 260, function (o) {
-      if (o.pod) return false;
-      if (n.ally) return o.sp.kind !== 'food' && o.sp.kind !== 'harmless' && o.sp.temper !== 'docile' && o.size >= n.size * 1.25;
-      return canHurt(o.sp) && o.size >= n.size * 4;
-    });
-    var prey = big || away ? null : findNear(n, 220, function (o) { return !o.pod && o.sp.kind !== 'food' && o.sp.kind !== 'harmless' && o.size <= n.size * 0.6 && (!n.ally || nearYou(o)); });
+    // v0.10: values decide. Run from a fish that out-fights this one (attack x health); go for one it can beat.
+    // The bites come from the fight loop in update(), so this only steers.
+    var big = findNear(n, 260, function (o) { return !o.pod && canBite(o.sp) && fightPower(o) > fightPower(n); });
+    var prey = big || away ? null : findNear(n, 220, function (o) { return !o.pod && o.sp.kind !== 'food' && fightPower(o) <= fightPower(n) && (!n.ally || nearYou(o)); });
     var food = big || prey || away || !n.ally ? null : findFeed(n, nearYou);
     var tx, ty, s;
     if (big) {
@@ -579,16 +577,6 @@
       tx = n.x + bdx / bd * 260; ty = n.y + bdy / bd * 260; s = 260;
     } else if (prey) {
       tx = prey.x; ty = prey.y; s = 190;
-      if (n.biteT <= 0 && distW(prey, n) < 40) {
-        n.biteT = STRIKE_S;
-        prey.hp -= atkOf(n.size);
-        burst(prey.x, prey.y, '#d9473a', 3);
-        schoolDefend(prey, n);
-        if (prey.hp <= 0 && !prey.dead) {
-          prey.dead = true; r.npcEaten++; dropChum(prey);
-          if (n.ally) allyCredit(prey);
-        }
-      }
     } else if (food) {
       tx = food.x; ty = food.y; s = 170;
       if (distW(food, n) < 30 && !food.dead) {
@@ -645,6 +633,11 @@
   // ---------- populations: the sea adapts to your size ----------
   // Only a non-docile fish with a damaging temper (hunter or ambusher) can hurt you.
   function canHurt(sp) { return (sp.kind === 'hunter' || sp.kind === 'ambush') && sp.temper !== 'docile'; }
+  // v0.10: any fish can fight any fish. Food and harmless fish never bite; every other fish does, docile or not.
+  // Fights are decided by the values: each bite takes off the attacker's attack, and a fish is out when its health is gone.
+  function canBite(sp) { return sp.kind !== 'food' && sp.kind !== 'harmless'; }
+  // A fish's fighting value, attack times the bites it can still take. Allies use it to pick fights they can win.
+  function fightPower(o) { return atkOf(o.size) * Math.max(1, o.hp); }
   function isThreat(o, P) { return canHurt(o.sp) && o.size >= P * 1.1; }
   function isEdible(o, P) { return o.sp.kind !== 'harmless' && o.sp.kind !== 'food' && o.size <= P * 0.87; }
 
@@ -1052,16 +1045,18 @@
     var d = distW(n, r);
     var reach = (lenFor(r.size, 'round') + lenFor(n.size, sp.shape)) * 0.36;
     if (d > reach) return;
-    if (canHurt(sp) && n.size >= r.size * 1.1 && !r.hidden) {
-      if (n.biteT <= 0) { n.biteT = STRIKE_S; hurt(n, atkOf(n.size)); }
+    if (sp.kind === 'food') {   // plankton and chum bits go in one go; they also start the bite timer
+      if (r.size >= n.size * 1.15) { r.biteT = Math.max(r.biteT, BITE_S); eatNPC(n); }
       return;
     }
-    if (sp.kind === 'food' && r.size >= n.size * 1.15) {   // plankton and chum bits go in one go; they also start the bite timer
-      r.biteT = Math.max(r.biteT, BITE_S);
-      eatNPC(n);
-      return;
+    // v0.10: a fight with a fish of any size. Each side bites on its own timer, for its attack value.
+    // Hidden under an anemone, the fish cannot bite you; you can still bite it.
+    if (canBite(sp) && !r.hidden && n.biteT <= 0) {
+      n.biteT = STRIKE_S;
+      hurt(n, atkOf(n.size));
+      if (mode !== 'play' || run !== r) return;   // you may have lost a life (the fish is then reset)
     }
-    if (r.size >= n.size * 1.15 && r.biteT <= 0) {
+    if (r.biteT <= 0) {
       r.biteT = BITE_S;
       n.hp -= atkOf(r.size);
       burst(n.x, n.y, '#d9473a', 5);
@@ -1126,25 +1121,27 @@
     }
     if (r.growPending) { r.growPending = false; checkGrowth(); }   // ally meals add to your size (v0.10)
 
-    // Fish eat fish: a non-docile fish at least 1.25x bigger bites a smaller fish it touches.
-    // Each bite takes off its attack value; the meal is gone when its health reaches zero.
+    // Fights between fish (v0.10): any fish bites any fish it touches, except food and its own species.
+    // Each bite takes off the attacker's attack value; a fish is out when its health reaches zero.
+    // An ally's kill feeds you (half a meal), and an ally that is killed counts as lost, not eaten.
     for (i = 0; i < r.npcs.length; i++) {
       var eater = r.npcs[i];
-      if (eater.dead || eater.biteT > 0 || eater.sp.kind === 'food' || eater.sp.kind === 'harmless' || eater.sp.temper === 'docile') continue;
+      if (eater.dead || eater.biteT > 0 || !canBite(eater.sp)) continue;
       for (var j = 0; j < r.npcs.length; j++) {
         var meal = r.npcs[j];
-        if (meal === eater || meal.dead || eater.size < meal.size * 1.25) continue;
+        if (meal === eater || meal.dead || meal.sp.kind === 'food' || meal.sp === eater.sp) continue;
         var md = distW(eater, meal);
         if (md < (lenFor(eater.size, eater.sp.shape) + lenFor(meal.size, meal.sp.shape)) * 0.36) {
-          eater.biteT = meal.sp.kind === 'food' ? BITE_S : STRIKE_S;
+          eater.biteT = STRIKE_S;
           meal.hp -= atkOf(eater.size);
           burst(meal.x, meal.y, '#d9473a', 4);
           schoolDefend(meal, eater);
           if (meal.hp <= 0) {
             meal.dead = true;
-            r.npcEaten++;
+            if (!meal.pod) r.npcEaten++;
             burst(meal.x, meal.y, meal.sp.col || '#ffffff', 4);
             dropChum(meal);
+            if (eater.ally) allyCredit(meal);
           }
           break;
         }
@@ -1795,8 +1792,19 @@
   showTitle();
   requestAnimationFrame(frame);
   // Test hook (used by the headless checks): jump to a size and apply the level rules.
+  // Test hook (v0.10): a fish of the given size placed beside you, to check fights. The last one is read back by state().
+  var testFish = null;
   window.FishGame = {
     resize: resize,
+    debugSpawnBeside: function (size) {
+      if (!run || mode !== 'play') return;
+      var f = { sp: { id: 'test', name: 'Test fish', tier: run.info.n, kind: 'hunter', temper: 'wary', shape: 'round', size: size, speed: 60, col: '#8a8a8a' },
+        x: run.x + 40, y: run.y, vx: 0, vy: 0, size: size, spd: 1, facing: 1, t: 0, anchor: { x: run.x + 40, y: run.y }, tgt: null, tT: 0,
+        cool: 0, lunge: 0, lx: 0, ly: 0, locked: false, lockT: 0, dead: false, hp: maxHpOf(size), maxHp: maxHpOf(size), biteT: 0, arrive: 0 };
+      f.maxHp = f.hp;
+      run.npcs.push(f);
+      testFish = f;
+    },
     debugSetSize: function (s) { if (run && mode === 'play') { run.size = s; checkGrowth(); } },
     loopErrors: function () { return errorLog.slice(); },
     bedAt: function (x) { return run ? bedY(x) : null; },
@@ -1822,7 +1830,8 @@
         nearestFood: run ? Math.round(Math.min.apply(null, [9999].concat(run.npcs.filter(function (o) { return o.sp.kind === 'food'; }).map(function (o) { return distXY(o.x, o.y, run.x, run.y); })))) : null, foods: run ? run.npcs.filter(function (o) { return o.sp.kind === 'food'; }).length : 0,
         chum: run ? run.npcs.filter(function (o) { return o.sp === CHUM; }).length : 0, hp: run && run.hp, maxHp: run && run.maxHp,
         player: run && { x: run.x, y: run.y }, cam: { x: cam.x, y: cam.y, scale: cam.scale },
-        hunters: run ? run.npcs.filter(function (o) { return o.sp.kind === 'hunter'; }).map(function (o) { return { x: o.x, y: o.y, size: o.size, locked: o.locked }; }) : []
+        hunters: run ? run.npcs.filter(function (o) { return o.sp.kind === 'hunter'; }).map(function (o) { return { x: o.x, y: o.y, size: o.size, locked: o.locked }; }) : [],
+        testFish: testFish ? { x: testFish.x, y: testFish.y, hp: testFish.hp, maxHp: testFish.maxHp, dead: !!testFish.dead } : null
       };
     }
   };
