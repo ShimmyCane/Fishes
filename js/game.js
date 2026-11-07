@@ -58,8 +58,10 @@
   function currentAt(y) { return 40 * Math.sin(2 * Math.PI * y / (run.info.H * 0.6)); }
   function hopHeight(size) { return clamp(30 + size * 3, 30, 140); }
   // Kelp patches on the seabed: small fish and plankton gather round them, and ambush fish patrol them.
+  // v0.11: about twice as much kelp and twice as many anemones as before, so the sea looks lived in.
+  var FLORA_SPACING = 130, ANEMONE_SPACING = 210;   // world units per patch / anemone
   function makeFlora(info) {
-    var count = Math.max(5, Math.round(info.W / 260)), list = [], i;
+    var count = Math.max(8, Math.round(info.W / FLORA_SPACING)), list = [], i;
     for (i = 0; i < count; i++) {
       list.push({ x: ((((i + rand(0.2, 0.8)) * info.W / count) % info.W) + info.W) % info.W,
         h: rand(70, 140), n: 5 + Math.floor(Math.random() * 4), seed: Math.random() * 10 });
@@ -385,7 +387,7 @@
   // Sea anemones are the safe spots (v0.11): spread around the sea. A fish under one is not hunted there.
   var ANEMONE_R = 90;
   function makeAnemones(info) {
-    var count = Math.max(4, Math.round(info.W / 420)), list = [], i;
+    var count = Math.max(6, Math.round(info.W / ANEMONE_SPACING)), list = [], i;
     for (i = 0; i < count; i++) {
       var ax = ((((i + rand(-0.3, 0.3)) * info.W / count) % info.W) + info.W) % info.W;
       list.push({ x: ax, y: bedY(ax) - 10 });
