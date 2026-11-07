@@ -1387,7 +1387,10 @@
     var r = run;
     var phone = Math.min(CW, CH) < 600 ? 2.5 : 1;   // phones: everything in play is 2.5x larger
     var ZOOM = 4;                                    // v0.10: the whole world is drawn 4x larger; the camera follows the fish
-    var viewW = 900 + r.size * 10, viewH = 560 + r.size * 6;
+    // v0.11: the view widens with the level, so each level shows about 10% more sea (the sea grows 10% a level),
+    // on top of the size term. It never shows more than 80% of the sea, so the edges stay out of view.
+    var lv = Math.pow(1.1, r.info.n - 1);
+    var viewW = Math.min((900 + r.size * 10) * lv, r.info.W * 0.8), viewH = Math.min((560 + r.size * 6) * lv, r.info.H * 0.8);
     cam.scale = Math.min(CW / viewW, CH / viewH) * phone * ZOOM;
     var k = Math.min(1, dt * 4);
     cam.x = wrapX(cam.x + dxW(r.x, cam.x) * k);

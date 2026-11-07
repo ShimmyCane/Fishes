@@ -123,6 +123,26 @@ async function allies(browser, url) {
   await p.close();
 }
 
+// Camera (v0.11): the sea is twice as big, and as you level up the view zooms out, yet the fish still looks bigger on screen.
+async function camera(browser, url) {
+  const ctx = await startRun(browser, url, 0, 1024, 768);
+  const p = ctx.page;
+  const read = function () { return p.evaluate(function () { return window.FishGame.state(); }); };
+  await p.waitForTimeout(300);
+  const first = await read();
+  await p.evaluate(function () { window.FishGame.debugSetSize(60); });   // a few levels up
+  await p.waitForTimeout(600);
+  const later = await read();
+  const onScreen = function (s) { return s.size * s.cam.scale; };   // fish length on screen, in pixels
+  check('the sea is twice the old size at level 1 (3200 wide)', first.W === 3200, 'W=' + first.W);
+  check('zooms out as you level up, and the fish still looks bigger',
+    later.level > first.level && later.cam.scale < first.cam.scale && onScreen(later) > onScreen(first),
+    'level ' + first.level + '->' + later.level + ', scale ' + first.cam.scale.toFixed(2) + '->' + later.cam.scale.toFixed(2) +
+    ', on screen ' + onScreen(first).toFixed(0) + 'px->' + onScreen(later).toFixed(0) + 'px');
+  check('no page errors (camera)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
 async function smoke(browser, url, seconds) {
   const ctx = await startRun(browser, url, 12, 1024, 768, 'joystick');
   for (let i = 0; i < 3; i++) { await ctx.page.click('#ally'); await ctx.page.waitForTimeout(100); }
@@ -143,8 +163,9 @@ async function smoke(browser, url, seconds) {
   try {
     if (which === 'all' || which === 'layout') await layout(browser, url);
     if (which === 'all' || which === 'allies') await allies(browser, url);
+    if (which === 'all' || which === 'camera') await camera(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'camera', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {
