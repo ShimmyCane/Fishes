@@ -704,20 +704,26 @@
     return (total === 0 || c.threat / total < threatShare()) ? 'threat' : 'edible';
   }
 
+  // v0.11: the sea is twice as big in each direction, so with the same fish it would be four times as empty.
+  // "Denser sea" (on by default) keeps the fish as dense as before the sea grew: four times the fish.
+  function denseOn() {
+    try { return localStorage.getItem('fish_dense') !== 'off'; } catch (e) { return true; }
+  }
   function fillPopulations(initial) {
     var r = run, n = r.info.n, counts = {}, i;
+    var dense = denseOn() ? 4 : 1;   // (3200 x 2000) / (1600 x 1000) = 4
     // Food first: plankton from tier 1, krill from tier 2.
     r.npcs.forEach(function (o) { if (!o.dead) counts[o.sp.id] = (counts[o.sp.id] || 0) + 1; });
     SPECIES.forEach(function (sp) {
       if (sp.kind !== 'food' || sp.tier > n) return;
-      var target = Math.round(sp.base * (1 + 0.05 * (n - 1)));
-      var add = Math.min(target - (counts[sp.id] || 0), initial ? target : 4);
+      var target = Math.round(sp.base * (1 + 0.05 * (n - 1)) * dense);
+      var add = Math.min(target - (counts[sp.id] || 0), initial ? target : 4 * dense);
       for (i = 0; i < add; i++) spawnNPC(sp, initial);
     });
     // Fish: a tier-sized population, split into threats and edible fish by the ratio.
     var c = census();
-    var need = Math.round(22 + 3 * n) - c.fish;
-    var budget = initial ? 999 : 2;
+    var need = Math.round((22 + 3 * n) * dense) - c.fish;
+    var budget = initial ? 999 : 2 * dense;
     while (need > 0 && budget > 0) {
       var role = pickRole(c), actual = role;
       var sp = pickSpecies(role, r.size);
@@ -1387,7 +1393,10 @@
     var r = run;
     var phone = Math.min(CW, CH) < 600 ? 2.5 : 1;   // phones: everything in play is 2.5x larger
     var ZOOM = 4;                                    // v0.10: the whole world is drawn 4x larger; the camera follows the fish
-    var viewW = 900 + r.size * 10, viewH = 560 + r.size * 6;
+    // v0.11: the view widens with the level, so each level shows about 10% more sea (the sea grows 10% a level),
+    // on top of the size term. It never shows more than 80% of the sea, so the edges stay out of view.
+    var lv = Math.pow(1.1, r.info.n - 1);
+    var viewW = Math.min((900 + r.size * 10) * lv, r.info.W * 0.8), viewH = Math.min((560 + r.size * 6) * lv, r.info.H * 0.8);
     cam.scale = Math.min(CW / viewW, CH / viewH) * phone * ZOOM;
     var k = Math.min(1, dt * 4);
     cam.x = wrapX(cam.x + dxW(r.x, cam.x) * k);
@@ -1510,6 +1519,8 @@
     $('errors-toggle').textContent = showErrors ? 'On' : 'Off';
     $('hp-toggle').setAttribute('aria-pressed', String(healthBarsOn()));
     $('hp-toggle').textContent = healthBarsOn() ? 'On' : 'Off';
+    $('dense-toggle').setAttribute('aria-pressed', String(denseOn()));
+    $('dense-toggle').textContent = denseOn() ? 'On' : 'Off';
     refreshNotes();
     refreshDbStatus();
   }
@@ -1679,6 +1690,12 @@
     renderErrors();
   });
   $('note-save').addEventListener('click', saveNote);
+  $('dense-toggle').addEventListener('click', function () {
+    var on = !denseOn();
+    try { localStorage.setItem('fish_dense', on ? 'on' : 'off'); } catch (e) { /* private mode */ }
+    $('dense-toggle').setAttribute('aria-pressed', String(on));
+    $('dense-toggle').textContent = on ? 'On' : 'Off';
+  });
   $('hp-toggle').addEventListener('click', function () {
     var on = !healthBarsOn();
     try { localStorage.setItem('fish_healthbars', on ? 'on' : 'off'); } catch (e) { /* private mode */ }
