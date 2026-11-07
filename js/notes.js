@@ -143,8 +143,39 @@
     });
   }
 
+  // Family notes from the database, with their status (signed in only). v0.11.
+  // Statuses: start (dashed circle), testing (yellow check), done (green check).
+  var STATUSES = ['start', 'testing', 'done'];
+  function remoteList(token) {
+    var url = CFG.supabaseUrl.replace(/\/+$/, '') + '/rest/v1/' + CFG.notesTable +
+      '?select=id,created_at,note,level,size,seconds,status&order=created_at.desc&limit=40';
+    return fetch(url, { headers: { 'apikey': CFG.supabaseKey, 'Authorization': 'Bearer ' + token } })
+      .then(function (res) {
+        if (!res.ok) throw new Error('Database returned ' + res.status);
+        return res.json();
+      }).then(function (rows) {
+        return rows.map(function (r) { return Object.assign({}, r, { status: STATUSES.indexOf(r.status) >= 0 ? r.status : 'start' }); });
+      });
+  }
+  // Changes one note's status. Resolves true when the database accepted it.
+  function remoteSetStatus(token, id, status) {
+    if (STATUSES.indexOf(status) < 0) return Promise.resolve(false);
+    var url = CFG.supabaseUrl.replace(/\/+$/, '') + '/rest/v1/' + CFG.notesTable + '?id=eq.' + encodeURIComponent(id);
+    return fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'apikey': CFG.supabaseKey, 'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json', 'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ status: status })
+    }).then(function (res) { return res.ok; }, function () { return false; });
+  }
+
   window.FishNotes = {
     list: load,
+    remoteList: remoteList,
+    remoteSetStatus: remoteSetStatus,
+    statuses: STATUSES,
     pending: pending,
     sendPending: sendPending,
 

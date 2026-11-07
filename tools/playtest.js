@@ -352,6 +352,20 @@ async function allyStay(browser, url) {
   await p.close();
 }
 
+// Settings (v0.11): the family notes list shows its sign-in message when you are not signed in.
+async function settingsPanel(browser, url) {
+  const ctx = await startRun(browser, url, 0, 1024, 768);
+  const p = ctx.page;
+  await p.waitForTimeout(300);
+  await p.click('#gear');
+  await p.waitForTimeout(400);
+  const msg = await p.evaluate(function () { const e = document.getElementById('status-msg'); return e ? e.textContent : null; });
+  check('settings shows the note status list, with a sign-in message when signed out',
+    msg !== null && /Sign in/.test(msg), 'status-msg="' + msg + '"');
+  check('no page errors (settings)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
 async function smoke(browser, url, seconds) {
   const ctx = await startRun(browser, url, 12, 1024, 768, 'joystick');
   for (let i = 0; i < 3; i++) { await ctx.page.click('#ally'); await ctx.page.waitForTimeout(100); }
@@ -379,8 +393,9 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'life') await life(browser, url);
     if (which === 'all' || which === 'pacing') await pacing(browser, url);
     if (which === 'all' || which === 'allystay') await allyStay(browser, url);
+    if (which === 'all' || which === 'settings') await settingsPanel(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {

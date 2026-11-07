@@ -1697,6 +1697,7 @@
     $('dense-toggle').textContent = denseOn() ? 'On' : 'Off';
     refreshNotes();
     refreshDbStatus();
+    refreshStatusBoard();
   }
 
   function closePanel() {
@@ -1724,6 +1725,61 @@
     if (s.message) el.title = s.message;
     $('title-db').textContent = text;
     $('title-db').setAttribute('data-state', s.state);
+  }
+
+  // v0.11: family notes with a status you can change from the panel. Needs the family sign-in.
+  var NOTE_STATUS = {
+    start: { glyph: '◌', label: 'Start anew' },
+    testing: { glyph: '🟡', label: 'Testing' },
+    done: { glyph: '✅', label: 'Done' }
+  };
+  var NEXT_STATUS = { start: 'testing', testing: 'done', done: 'start' };
+  function refreshStatusBoard() {
+    var msg = $('status-msg'), box = $('status-list');
+    if (!window.FishFamily || !window.FishNotes) return;
+    window.FishFamily.token().then(function (token) {
+      box.innerHTML = '';
+      if (!token) { msg.textContent = 'Sign in to see and change the status of notes.'; return; }
+      msg.textContent = 'Loading notes…';
+      return window.FishNotes.remoteList(token).then(function (rows) {
+        msg.textContent = rows.length ? '' : 'No notes in the family table yet.';
+        rows.forEach(function (n) { box.appendChild(statusRow(n)); });
+      });
+    }).catch(function (err) {
+      msg.textContent = 'Could not load notes (' + (err && err.message || 'network') + ').';
+    });
+  }
+  function statusRow(n) {
+    var item = document.createElement('div');
+    item.className = 'note-item';
+    var meta = document.createElement('small');
+    meta.textContent = 'Level ' + n.level + ' · size ' + Number(n.size).toFixed(1) + ' · ' + mmss(n.seconds || 0);
+    var text = document.createElement('p');
+    text.textContent = n.note;
+    var btn = document.createElement('button');
+    btn.className = 'status-btn';
+    btn.setAttribute('data-status', n.status);
+    btn.setAttribute('aria-label', 'Status: ' + NOTE_STATUS[n.status].label + '. Tap to change.');
+    btn.textContent = NOTE_STATUS[n.status].glyph + ' ' + NOTE_STATUS[n.status].label;
+    btn.addEventListener('click', function () {
+      var next = NEXT_STATUS[n.status];
+      btn.disabled = true;
+      window.FishFamily.token().then(function (token) {
+        if (!token) { $('status-msg').textContent = 'Sign in to change the status.'; btn.disabled = false; return; }
+        return window.FishNotes.remoteSetStatus(token, n.id, next).then(function (ok) {
+          if (!ok) { $('status-msg').textContent = 'Could not change the status. Try again.'; btn.disabled = false; return; }
+          n.status = next;
+          btn.setAttribute('data-status', next);
+          btn.textContent = NOTE_STATUS[next].glyph + ' ' + NOTE_STATUS[next].label;
+          btn.setAttribute('aria-label', 'Status: ' + NOTE_STATUS[next].label + '. Tap to change.');
+          btn.disabled = false;
+        });
+      });
+    });
+    item.appendChild(meta);
+    item.appendChild(text);
+    item.appendChild(btn);
+    return item;
   }
 
   function refreshNotes() {
@@ -1902,7 +1958,7 @@
     $('family-out').hidden = !s.signedIn;
     $('family-in').hidden = s.signedIn;
     if (s.signedIn) {
-      FishNotes.sendPending().then(function () { refreshNotes(); refreshDbStatus(); });
+      FishNotes.sendPending().then(function () { refreshNotes(); refreshDbStatus(); refreshStatusBoard(); });
     }
   });
 
