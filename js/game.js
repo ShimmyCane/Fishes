@@ -549,6 +549,10 @@
   }
 
   function drawEntity(e, t) {
+    if (e.friend && e.joinT !== undefined && e.joinT < JOIN_S) {   // v0.12: a new friend fades in as it joins you
+      ctx.globalAlpha = 0.4 + 0.6 * e.joinT / JOIN_S; drawBody(e, e.desc || e.sp, t); ctx.globalAlpha = 1;
+      return;
+    }
     if (e.morph) {   // v0.12: a school member changing form cross-fades from its old look to its new one
       var p = clamp(e.morph.t / e.morph.dur, 0, 1);
       ctx.globalAlpha = 1 - p; drawBody(e, e.morph.from, t);
@@ -752,13 +756,59 @@
 
   // Allies (v0.9): one EXP (size) buys an allied fish. Each living ally adds one to the price,
   // so when allies die the price falls back with them.
-  function liveAllies() { return run.npcs.filter(function (o) { return o.ally && !o.dead; }).length; }
+  // v0.12 followers: your bought allies and your friends. Their total size may not exceed ALLY_LIMIT x your size.
+  // Over the limit, one follower is released at a time (it turns back into a wild fish) until you are under it.
+  // Friends (see tendFollowers) are not bought, so they do not raise the price of the next ally.
+  var ALLY_LIMIT = 2, RELEASE_S = 0.6;
+  function followers() { return run.npcs.filter(function (o) { return o.ally && !o.dead; }); }
+  function followerMass() { return followers().reduce(function (a, o) { return a + o.size; }, 0); }
+  function liveAllies() { return run.npcs.filter(function (o) { return o.ally && !o.friend && !o.dead; }).length; }
   function allyCost() { return liveAllies() + 1; }
+
+  // v0.12 friends: a fish of your body shape, 90% to 100% of your size, that stays just outside your bite range
+  // for FRIEND_S seconds joins you. Touching it (an attack) or moving away starts the wait again.
+  // A released friend waits FRIEND_BACK_S before it can be befriended again.
+  var FRIEND_S = 3, JOIN_S = 2, FRIEND_BACK_S = 20;
+  function joinFriend(o) {
+    o.ally = true; o.pod = true; o.friend = true; o.joinT = 0; o.greetT = 0;
+    o.podA = Math.random() * Math.PI * 2;   // its place round you, as the school has
+    burst(o.x, o.y, '#5fd0c0', 8);
+    floatText(o.x, o.y, 'Friend!');
+    FishSound.play('eat');
+  }
+  function releaseFollower(o) {
+    o.ally = false; o.pod = false; o.friend = false; o.morph = null; o.joinT = undefined; o.greetT = 0;
+    o.friendBackAt = run.t + FRIEND_BACK_S;
+    burst(o.x, o.y, '#9aa5ad', 6);
+    floatText(o.x, o.y, 'Released');
+  }
+  function tendFollowers(dt) {
+    var r = run, P = r.size, shape = playerDesc().shape;
+    r.releaseT = Math.max(0, (r.releaseT || 0) - dt);
+    if (followerMass() > ALLY_LIMIT * P && r.releaseT <= 0) {
+      var big = null;
+      followers().forEach(function (o) { if (!big || o.size > big.size) big = o; });
+      if (big) releaseFollower(big);
+      r.releaseT = RELEASE_S;
+    }
+    r.npcs.forEach(function (o) {
+      if (o.dead) return;
+      var eligible = !o.pod && !o.ally && o.sp.kind === 'prey' && !o.sp.sting && !o.sp.trash && o.sp.shape === shape &&
+        o.size >= P * 0.9 && o.size <= P && r.t >= (o.friendBackAt || 0);
+      // The same reach as checkContact (contact below 0.36 of the two lengths); the friend band is just outside it.
+      var sum = lenFor(P, 'round') + lenFor(o.size, o.sp.shape), d = distW(o, r);
+      if (!eligible || d < sum * 0.36 || d > sum * 0.9) { o.greetT = 0; return; }
+      o.greetT = (o.greetT || 0) + dt;
+      if (o.greetT >= FRIEND_S && followerMass() + o.size <= ALLY_LIMIT * P) joinFriend(o);
+    });
+  }
   function buyAlly() {
     if (!run || mode !== 'play' || paused) return;
     var cost = allyCost();
     // v0.11: EXP is size. Buying spends the growth of this level, never the levels you have already reached.
     if (run.size - cost < run.info.enterSize) { floatText(run.x, run.y, 'Not enough EXP left on this level'); return; }
+    // v0.12: an ally would be as big as half of you; refuse it if the followers would go over the limit.
+    if (followerMass() + Math.max(0.5, run.size * 0.5) > ALLY_LIMIT * run.size) { floatText(run.x, run.y, 'Your allies are full'); return; }
     run.size -= cost;
     run.allySpent = (run.allySpent || 0) + cost;   // test hook: what buys have charged in total
     spawnPod(true);
@@ -774,7 +824,7 @@
   var CMD_S = 8, CMD_COOL = 20;
   function commandAllies() {
     if (!run || mode !== 'play' || paused) return;
-    if (liveAllies() === 0) { floatText(run.x, run.y, 'No allies'); return; }
+    if (followers().length === 0) { floatText(run.x, run.y, 'No allies'); return; }
     if ((run.cmdCd || 0) > 0) { floatText(run.x, run.y, 'Ready in ' + Math.ceil(run.cmdCd) + 's'); return; }
     var tgt = run.lastBit && !run.lastBit.dead && !run.lastBit.pod && distW(run.lastBit, run) < 400 ? run.lastBit : null;
     if (!tgt) {
@@ -812,7 +862,8 @@
       n.morph.t += dt;
       if (n.morph.t >= n.morph.dur) { n.sp = podSpecies(); n.morph = null; }
     }
-    n.size = Math.max(0.5, r.size * 0.5);                      // the pod grows as you grow
+    if (n.friend && n.joinT !== undefined && n.joinT < JOIN_S) n.joinT += dt;   // a new friend fades in as it joins
+    if (!n.friend) n.size = Math.max(0.5, r.size * 0.5);       // the pod grows as you grow; a friend keeps its own size
     n.hp = Math.min(n.hp, maxHpOf(n.size)); n.maxHp = maxHpOf(n.size);
     if (n.ally) {   // v0.11: heal after a pause without a hit
       if (n.lastHp !== undefined && n.hp < n.lastHp) n.quietT = 0; else n.quietT = (n.quietT || 0) + dt;
@@ -1497,6 +1548,8 @@
       }
     }
 
+    tendFollowers(dt);   // v0.12: friends join, and followers over the limit are released
+
     var locks = 0;
     for (i = 0; i < r.npcs.length; i++) if (r.npcs[i].locked) locks++;
     if (locks > (r.lockedCount || 0)) FishSound.play('lock');
@@ -1704,6 +1757,16 @@
       ctx.arc(n.x, n.y, rad, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
+    });
+
+    // v0.12: a teal ring fills round a fish you are befriending. Full, it joins you (FRIEND_S seconds).
+    list.forEach(function (n) {
+      if (!(n.greetT > 0) || n.ally) return;
+      var rad = lenFor(n.size, n.sp.shape) * 0.75 + 8 / cam.scale;
+      ctx.strokeStyle = '#5fd0c0'; ctx.lineWidth = 3 / cam.scale;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, rad, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(n.greetT / FRIEND_S, 0, 1));
+      ctx.stroke();
     });
 
     run.parts.forEach(function (p) {
@@ -2252,12 +2315,13 @@
   window.FishGame = {
     resize: resize,
     // Test hook (v0.11): a creature of the given species id placed beside you. Read back through state().testCreature.
-    debugSpawnCreature: function (id) {
+    debugSpawnCreature: function (id, size) {
       if (!run || mode !== 'play') return;
       var sp = SPECIES.filter(function (x) { return x.id === id; })[0];
       if (!sp) return;
       spawnNPC(sp, false);
       var f = run.npcs[run.npcs.length - 1];
+      if (size) { f.size = size; f.hp = maxHpOf(size); f.maxHp = f.hp; }   // test hook: a fish of a chosen size
       f.x = run.x + 40; f.y = run.y; f.arrive = 0; f.anchor = { x: f.x, y: f.y };
       testCreature = f;
     },
@@ -2292,8 +2356,10 @@
         forests: run && run.flora ? run.flora.filter(function (f) { return f.forest; }).length : null,
         calm: run ? +(run.calmT || 0).toFixed(2) : null, bedNear: run ? Math.round(bedY(run.x)) : null,
         morphing: run ? run.npcs.filter(function (o) { return o.morph && !o.dead; }).length : null,
-        allies: run ? run.npcs.filter(function (o) { return o.ally && !o.dead; }).length : 0,
-        allyCost: run ? run.npcs.filter(function (o) { return o.ally && !o.dead; }).length + 1 : null,
+        allies: run ? run.npcs.filter(function (o) { return o.ally && !o.friend && !o.dead; }).length : 0,
+        friends: run ? run.npcs.filter(function (o) { return o.friend && !o.dead; }).length : 0,
+        followerMass: run ? +followerMass().toFixed(2) : null, followerLimit: run ? +(ALLY_LIMIT * run.size).toFixed(2) : null,
+        allyCost: run ? run.npcs.filter(function (o) { return o.ally && !o.friend && !o.dead; }).length + 1 : null,
         locks: run ? run.lockedCount : 0, lives: run && run.lives,
         npcEaten: run && run.npcEaten, difficulty: run && run.difficulty, form: run && run.form && run.form.id,
         census: run ? census() : null, spread: run ? spread() : null,
@@ -2309,7 +2375,8 @@
         goal: run ? run.goal : null, fedFish: run ? run.fedFish || 0 : null,
         command: run && run.cmd ? { t: run.cmd.t, target: !run.cmd.target.dead } : null,
         commandCooldown: run ? run.cmdCd || 0 : null,
-        testCreature: testCreature ? { x: testCreature.x, y: testCreature.y, hp: testCreature.hp, dead: !!testCreature.dead } : null,
+        testCreature: testCreature ? { x: testCreature.x, y: testCreature.y, hp: testCreature.hp, dead: !!testCreature.dead,
+          friend: !!testCreature.friend, greetT: testCreature.greetT || 0, size: testCreature.size } : null,
         birds: run && run.birds ? run.birds.length : null,
         creatures: run ? { trash: run.npcs.filter(function (o) { return !o.dead && o.sp.trash; }).length,
           turtle: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'turtle'; }).length,

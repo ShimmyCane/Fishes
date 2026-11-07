@@ -206,6 +206,63 @@ async function density(browser, url) {
   check('no page errors (density)', on.errors.length === 0 && off.errors.length === 0, on.errors.concat(off.errors).join(' | '));
 }
 
+// v0.12 friends and followers: a similar fish that stays just outside your bite range for 3 s joins you.
+// Touching it resets the wait. Followers over the limit (2 x your size) are released one at a time.
+async function friendsAndFollowers(browser, url) {
+  const ctx = await startRun(browser, url, 12, 1024, 768);   // level 2: your form is a slim fish
+  const p = ctx.page;
+  await p.waitForTimeout(6000);   // the calm after the start
+  // A clownfish is round like your level-2 form (the clownfish) and 11 long against your 12, so it does not flee. Keep it in the friend band (not touching).
+  await p.evaluate(function () { window.FishGame.debugSpawnCreature('clownfish', 11); });
+  let st = null;
+  for (let i = 0; i < 24; i++) {
+    await p.evaluate(function () {
+      const t = window.FishGame.state().testCreature;
+      if (t && !t.dead && !t.friend) window.FishGame.debugMove(t.x - 110, t.y);
+    });
+    await p.waitForTimeout(250);
+    st = await p.evaluate(function () { return window.FishGame.state(); });
+    if (st.friends >= 1) break;
+  }
+  check('a similar fish that stays close, without touching you, joins you after 3 s',
+    st.friends >= 1 && !!st.testCreature && st.testCreature.friend,
+    'friends=' + st.friends + ', mass ' + st.followerMass + ' of limit ' + st.followerLimit + ', level ' + st.level);
+
+  // Touching resets the wait: a clownfish is kept in the band for 2.4 s, touched once, then in the band for 2.4 s. No friend.
+  await p.evaluate(function () { window.FishGame.debugSpawnCreature('clownfish', 11); });
+  const touchOnce = async function (ms) {
+    for (let t = 0; t < ms; t += 250) {
+      await p.evaluate(function () {
+        const c = window.FishGame.state().testCreature;
+        if (c && !c.dead && !c.friend) window.FishGame.debugMove(c.x - 110, c.y);
+      });
+      await p.waitForTimeout(250);
+    }
+  };
+  await touchOnce(2400);
+  await p.evaluate(function () {   // touch it: put you on top of it for one step
+    const c = window.FishGame.state().testCreature;
+    if (c && !c.dead) window.FishGame.debugMove(c.x - 5, c.y);
+  });
+  await p.waitForTimeout(250);
+  const mid = await p.evaluate(function () { return window.FishGame.state(); });
+  await touchOnce(2400);
+  const after = await p.evaluate(function () { return window.FishGame.state(); });
+  check('touching a fish starts the three seconds again (it does not join)',
+    after.testCreature && !after.testCreature.friend,
+    'greet=' + (mid.testCreature && mid.testCreature.greetT) + ' then ' + (after.testCreature && after.testCreature.greetT) + ', friend=' + (after.testCreature && after.testCreature.friend));
+
+  // Release: a friend of 11 with your size at 4 is over the limit (2 x 4 = 8). It is released, one at a time.
+  await p.evaluate(function () { window.FishGame.debugSetSize(4); });
+  await p.waitForTimeout(2500);
+  const rel = await p.evaluate(function () { return window.FishGame.state(); });
+  check('followers over the limit are released until you are under it',
+    rel.friends === 0 && rel.followerMass <= rel.followerLimit + 0.01,
+    'friends=' + rel.friends + ', mass ' + rel.followerMass + ' vs limit ' + rel.followerLimit);
+  check('no page errors (friends)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
 // v0.12: a level-up starts a calm, and only one level comes per calm. Growth past the goal waits for the calm to end.
 async function calmLevels(browser, url) {
   const ctx = await startRun(browser, url, 70, 1024, 768);   // level 6; the start sets a calm, so wait it out
@@ -565,8 +622,9 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'schoolforms') await schoolForms(browser, url);
     if (which === 'all' || which === 'harmless') await harmlessIsNotFood(browser, url);
     if (which === 'all' || which === 'background') await backgroundItems(browser, url);
+    if (which === 'all' || which === 'friends') await friendsAndFollowers(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {
