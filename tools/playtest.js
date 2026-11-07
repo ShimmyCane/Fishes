@@ -389,6 +389,26 @@ async function settingsPanel(browser, url) {
   await p.close();
 }
 
+// Calm (v0.11): no predators are spawned, and nothing can hurt you.
+async function calm(browser, url) {
+  const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+  const errors = [];
+  page.on('pageerror', function (e) { errors.push(e.message); });
+  await page.addInitScript(function () { localStorage.setItem('fish_difficulty', 'calm'); });
+  await page.goto(url);
+  await page.click('#btn-play');
+  await page.waitForTimeout(500);
+  await page.evaluate(function () { window.FishGame.debugSetSize(30); });   // a bigger level, with more fish
+  await page.waitForTimeout(6000);
+  const st = await page.evaluate(function () { return window.FishGame.state(); });
+  // Smaller hunters are harmless to you; the rule is that nothing bigger than you is in the sea.
+  const bigger = st.hunters.filter(function (h) { return h.size >= st.size * 1.1; }).length;
+  check('calm: no predators bigger than you are in the sea', bigger === 0 && st.census.threat === 0,
+    'bigger hunters=' + bigger + ' threats=' + st.census.threat + ' level=' + st.level + ' size=' + st.size.toFixed(1));
+  check('no page errors (calm)', errors.length === 0, errors.join(' | '));
+  await page.close();
+}
+
 async function smoke(browser, url, seconds) {
   const ctx = await startRun(browser, url, 12, 1024, 768, 'joystick');
   for (let i = 0; i < 3; i++) { await ctx.page.click('#ally'); await ctx.page.waitForTimeout(100); }
@@ -417,8 +437,9 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'pacing') await pacing(browser, url);
     if (which === 'all' || which === 'allystay') await allyStay(browser, url);
     if (which === 'all' || which === 'settings') await settingsPanel(browser, url);
+    if (which === 'all' || which === 'calm') await calm(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {

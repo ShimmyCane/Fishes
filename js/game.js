@@ -1198,6 +1198,7 @@
 
   function hurt(n, dmg) {
     var r = run;
+    if (D.DIFFICULTY[r.difficulty] && D.DIFFICULTY[r.difficulty].calm) return;   // v0.11 Calm: nothing can hurt you
     r.hitBy = n.sp.name;
     if (r.inv > 0) return;
     r.quietT = 0;
