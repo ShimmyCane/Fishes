@@ -191,6 +191,51 @@ async function density(browser, url) {
   check('no page errors (density)', on.errors.length === 0 && off.errors.length === 0, on.errors.concat(off.errors).join(' | '));
 }
 
+// Creatures (v0.11): turtles, crabs, jellyfish and gulls live in the sea. Jellyfish sting, crabs stay on the bed.
+async function creatures(browser, url) {
+  const ctx = await startRun(browser, url, 0, 1024, 768);
+  const p = ctx.page;
+  await p.waitForTimeout(1500);
+  const st = await p.evaluate(function () { return window.FishGame.state(); });
+  check('turtles, crabs and gulls are in the sea at level 1',
+    st.creatures.turtle >= 1 && st.creatures.crab >= 1 && st.birds >= 1,
+    'turtles=' + st.creatures.turtle + ' crabs=' + st.creatures.crab + ' gulls=' + st.birds);
+
+  // A jellyfish stings you when you touch it, and you cannot eat it. Keep it beside you, after the start invulnerability.
+  await p.waitForTimeout(2500);
+  const before = await p.evaluate(function () { return window.FishGame.state(); });
+  await p.evaluate(function () { window.FishGame.debugSpawnCreature('moon'); });
+  for (let i = 0; i < 12; i++) {
+    await p.evaluate(function () {
+      const s = window.FishGame.state();
+      if (s.testCreature && !s.testCreature.dead) window.FishGame.debugMove(s.testCreature.x - 30, s.testCreature.y);
+    });
+    await p.waitForTimeout(250);
+  }
+  const jelly = await p.evaluate(function () { return window.FishGame.state(); });
+  check('a jellyfish stings you and cannot be eaten',
+    jelly.hp < before.hp && jelly.testCreature && !jelly.testCreature.dead,
+    'your hp ' + before.hp.toFixed(1) + ' -> ' + jelly.hp.toFixed(1) + ', jellyfish dead=' + (jelly.testCreature && jelly.testCreature.dead));
+
+  // A crab walks the seabed: it sits just above the bed wherever it goes.
+  await p.evaluate(function () { window.FishGame.debugSpawnCreature('crab'); });
+  await p.waitForTimeout(2000);
+  const crab = await p.evaluate(function () {
+    const s = window.FishGame.state();
+    return { x: s.testCreature.x, y: s.testCreature.y, bed: window.FishGame.bedAt(s.testCreature.x) };
+  });
+  check('a crab stays on the seabed', Math.abs(crab.y - (crab.bed - 12)) < 1,
+    'crab y=' + crab.y.toFixed(1) + ', bed at its x=' + crab.bed.toFixed(1));
+  // Jellyfish come in from level 3.
+  await p.evaluate(function () { window.FishGame.debugSetSize(14); });
+  await p.waitForTimeout(2500);
+  const l3 = await p.evaluate(function () { return window.FishGame.state(); });
+  check('jellyfish are in the sea from level 3', l3.level >= 3 && l3.creatures.moon >= 1,
+    'level ' + l3.level + ', jellyfish=' + l3.creatures.moon);
+  check('no page errors (creatures)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
 async function smoke(browser, url, seconds) {
   const ctx = await startRun(browser, url, 12, 1024, 768, 'joystick');
   for (let i = 0; i < 3; i++) { await ctx.page.click('#ally'); await ctx.page.waitForTimeout(100); }
@@ -214,8 +259,9 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'fights') await fights(browser, url);
     if (which === 'all' || which === 'camera') await camera(browser, url);
     if (which === 'all' || which === 'density') await density(browser, url);
+    if (which === 'all' || which === 'creatures') await creatures(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {

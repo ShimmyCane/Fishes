@@ -3,6 +3,10 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.10 — unreleased
+- New creatures, none of them hunt you:
+  - Green sea turtles and rock crabs in the shallows. Crabs walk sideways along the seabed.
+  - Moon jellyfish from level 3. They drift, and touching one stings you for a little health (every 1.5 s). You cannot eat them, so swim round them.
+  - Gulls glide over the surface. They show when you are near the top of the sea.
 - Any fish can fight any fish. Two fish that touch fight whatever their size: each bites for its attack value, and the one whose health runs out first is removed. You can now bite bigger fish, and they bite back. Food and harmless fish never bite, and fish of one species don't fight each other.
 - Allies run from anything that out-fights them (attack times health) and go for anything they can beat, rather than using a fixed size rule.
 - Denser sea (on by default, Settings → Sound, errors, display and controls): the bigger sea has four times the fish, so it is as dense as before it grew. Turn it off for the sparser sea (and a little less work for the phone).

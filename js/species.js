@@ -14,8 +14,8 @@
      prey        small fish that flee bigger fish; some school
      ambush      sits near a spot and lunges
      hunter      roams and chases
-     harmless    drifts; never attacks
-   shape: round | slim | torpedo | puff | lantern | eel | lure | krill | plankton | oar | whale
+     harmless    drifts; never attacks (v0.11: jellyfish sting on contact; crabs stay on the seabed)
+   shape: round | slim | torpedo | puff | lantern | eel | lure | krill | plankton | oar | whale | jelly | turtle | crab (v0.11)
 */
 (function () {
   'use strict';
@@ -31,6 +31,22 @@
     { id: 'plankton', name: 'Plankton', tier: 1, kind: 'food', temper: 'docile', shape: 'plankton', size: 0.25, speed: 14, col: '#fff3b0', base: 70,
       real: 'Copepods and other drifting animals. Most of the sea starts here.' },
 
+    // v0.11 creatures: scenery and a hazard. They never hunt. Spawned a few per level (see fillCreatures in game.js).
+    { id: 'turtle', name: 'Green sea turtle', tier: 1, kind: 'harmless', temper: 'docile', shape: 'turtle', hr: 0.6, size: 4, speed: 28, col: '#6f9a4e', fin: '#4f7a36', belly: '#e8e0b0',
+      real: 'Green sea turtle: grazes sea grass and comes up to breathe.' },
+    { id: 'crab', name: 'Rock crab', tier: 1, kind: 'harmless', temper: 'docile', shape: 'crab', hr: 0.5, size: 1.6, speed: 22, col: '#c96b4a', fin: '#a7513a', bed: true,
+      real: 'Rock crab: walks sideways over the seabed and hides under rocks and kelp.' },
+
+    // Tier 3 — Rock Pool Edge
+    { id: 'wrasse', name: 'Cleaner wrasse', tier: 3, kind: 'prey', temper: 'wary', shape: 'slim', hr: 0.36, size: 2.0, speed: 110, col: '#ffd34d', tail: '#ffd34d', stripe: '#2d6fd0', school: true,
+      real: 'Cleaner wrasse: picks parasites off bigger fish, and is usually left alone.' },
+    { id: 'herring', name: 'Herring', tier: 3, kind: 'prey', temper: 'docile', shape: 'slim', hr: 0.3, size: 2.4, speed: 95, col: '#c4d9ef', fin: '#a7c4e0', school: true,
+      real: 'Herring: huge shoals keep predators busy.' },
+    { id: 'sardine', name: 'Sardine', tier: 3, kind: 'prey', temper: 'docile', shape: 'slim', hr: 0.3, size: 2.2, speed: 95, col: '#9fb8d8', school: true,
+      real: 'Sardine: a small schooling fish that filter-feeds on plankton.' },
+    { id: 'hawkfish', name: 'Hawkfish', tier: 3, kind: 'hunter', temper: 'wary', shape: 'round', hr: 0.5, size: 2.8, speed: 90, col: '#d9573f', fin: '#c04a33',
+      real: 'Hawkfish: perches on coral and drops on small fish.' },
+
     // Tier 2 — Sea-grass Flats
     { id: 'clownfish', name: 'Clownfish', tier: 2, kind: 'prey', temper: 'docile', shape: 'round', hr: 0.6, size: 1.6, speed: 70, col: '#ff9d5c', fin: '#ff9d5c', bands: [-0.35, 0.4], bandCol: '#ffffff',
       real: 'Clownfish: lives among sea anemone tentacles, shielded by their sting.' },
@@ -43,15 +59,9 @@
     { id: 'krill', name: 'Krill', tier: 2, kind: 'food', temper: 'docile', shape: 'krill', hr: 0.35, size: 0.5, speed: 30, col: '#ffb3a7', base: 12,
       real: 'Shrimp-like krill, food for many fish and whales.' },
 
-    // Tier 3 — Rock Pool Edge
-    { id: 'wrasse', name: 'Cleaner wrasse', tier: 3, kind: 'prey', temper: 'wary', shape: 'slim', hr: 0.36, size: 2.0, speed: 110, col: '#ffd34d', tail: '#ffd34d', stripe: '#2d6fd0', school: true,
-      real: 'Cleaner wrasse: picks parasites off bigger fish, and is usually left alone.' },
-    { id: 'herring', name: 'Herring', tier: 3, kind: 'prey', temper: 'docile', shape: 'slim', hr: 0.3, size: 2.4, speed: 95, col: '#c4d9ef', fin: '#a7c4e0', school: true,
-      real: 'Herring: huge shoals keep predators busy.' },
-    { id: 'sardine', name: 'Sardine', tier: 3, kind: 'prey', temper: 'docile', shape: 'slim', hr: 0.3, size: 2.2, speed: 95, col: '#9fb8d8', school: true,
-      real: 'Sardine: a small schooling fish that filter-feeds on plankton.' },
-    { id: 'hawkfish', name: 'Hawkfish', tier: 3, kind: 'hunter', temper: 'wary', shape: 'round', hr: 0.5, size: 2.8, speed: 90, col: '#d9573f', fin: '#c04a33',
-      real: 'Hawkfish: perches on coral and drops on small fish.' },
+    // A jellyfish stings you when you touch it (every 1.5 s, 2 health) and cannot be eaten.
+    { id: 'moon', name: 'Moon jellyfish', tier: 3, kind: 'harmless', temper: 'docile', shape: 'jelly', hr: 0.6, size: 3, speed: 18, col: '#ff8a70', fin: '#ffc1a8', sting: true,
+      real: 'Moon jellyfish: drifts with the current and stings with its tentacles.' },
 
     // Tier 4 — Sandy Shelf
     { id: 'anchovy', name: 'Anchovy', tier: 4, kind: 'prey', temper: 'docile', shape: 'slim', hr: 0.28, size: 2.8, speed: 100, col: '#b8d8e8', school: true,
