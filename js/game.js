@@ -327,6 +327,84 @@
     }
   }
 
+  // v0.11 creatures. Drawn in the fish's own space: the body is about len long, facing right.
+  function jellyFish(len, d, t, lw) {
+    var R = len * 0.4, pulse = 1 + 0.12 * Math.sin(t * 3), i, k;
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = d.col; ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.8;
+    ctx.beginPath(); ctx.ellipse(0, 0, R * pulse, R * 0.8 / pulse, 0, Math.PI, 0); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = d.fin; ctx.lineWidth = lw * 0.6;
+    for (i = 0; i < 5; i++) {
+      var x0 = -R * 0.8 + i * R * 0.4, wob = Math.sin(t * 2 + i) * R * 0.2;
+      ctx.beginPath(); ctx.moveTo(x0, 0);
+      for (k = 1; k <= 2; k++) ctx.bezierCurveTo(x0 + wob, R * 0.5 * k, x0 - wob, R * 0.5 * k + R * 0.25, x0, R * 0.6 * k + R * 0.5);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function turtleShape(len, d, t, lw) {
+    var L = len / 2, H = len * 0.32, paddle = Math.sin(t * 2) * 0.6;
+    ctx.lineWidth = lw * 0.8; ctx.strokeStyle = OUT;
+    ctx.fillStyle = d.belly || '#e8e0b0';
+    ctx.beginPath(); ctx.ellipse(L * 0.95, 0, L * 0.22, H * 0.28, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();   // head
+    ctx.fillStyle = d.fin;
+    [[L * 0.35, 1, 0.5], [L * 0.35, -1, 0.5], [-L * 0.55, 1, 0.35], [-L * 0.55, -1, 0.35]].forEach(function (f) {   // flippers
+      ctx.save(); ctx.translate(f[0], f[1] * H * 0.9); ctx.rotate(f[1] * (paddle + 0.3));
+      ctx.beginPath(); ctx.ellipse(0, 0, L * f[2], H * 0.22, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
+    });
+    ctx.fillStyle = d.col;
+    ctx.beginPath(); ctx.ellipse(0, 0, L, H, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();   // shell
+    ctx.strokeStyle = d.fin; ctx.lineWidth = lw * 0.7;
+    ctx.beginPath(); ctx.ellipse(0, 0, L * 0.55, H * 0.55, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  function crabShape(len, d, t, lw) {
+    var W = len / 2, H = len * 0.3, i, side;
+    ctx.lineWidth = lw * 0.7; ctx.strokeStyle = OUT;
+    ctx.strokeStyle = d.fin;
+    for (side = -1; side <= 1; side += 2) {   // legs: three a side, wiggling as it walks
+      for (i = 0; i < 3; i++) {
+        var lx = -W * 0.3 + i * W * 0.35, wig = Math.sin(t * 6 + i + side) * 2;
+        ctx.beginPath(); ctx.moveTo(lx, side * H * 0.4); ctx.lineTo(lx + wig, side * H * 1.3); ctx.stroke();
+      }
+    }
+    ctx.strokeStyle = OUT; ctx.fillStyle = d.col;
+    ctx.beginPath(); ctx.ellipse(0, 0, W * 0.75, H * 0.7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();   // shell
+    for (side = -1; side <= 1; side += 2) {   // claws
+      ctx.beginPath(); ctx.moveTo(W * 0.5, side * H * 0.3); ctx.lineTo(W * 0.95, side * H * 0.9); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(W * 1.05, side * H * 1.0, H * 0.4, H * 0.3, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    for (side = -1; side <= 1; side += 2) {   // eyes on stalks
+      ctx.beginPath(); ctx.moveTo(W * 0.4, -H * 0.5); ctx.lineTo(W * 0.4 + side * W * 0.05, -H * 1.0); ctx.stroke();
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(W * 0.4 + side * W * 0.05, -H * 1.05, lw * 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // Sea birds (v0.11): gulls glide over the surface. They are scenery only, so they do not touch the game.
+  function makeBirds(info) {
+    var list = [], n = 2 + Math.floor(info.n / 4), i;
+    for (i = 0; i < n; i++) {
+      var x = rand(0, info.W);
+      list.push({ x: x, y: surfY(x) - rand(170, 280), dir: Math.random() < 0.5 ? 1 : -1, speed: rand(40, 70), t: rand(0, 6) });
+    }
+    return list;
+  }
+  function updateBirds(dt) {
+    (run.birds || []).forEach(function (b) { b.x = wrapX(b.x + b.dir * b.speed * dt); b.t += dt; });
+  }
+  function drawBirds() {
+    (run.birds || []).forEach(function (b) {
+      var flap = Math.sin(b.t * 9) * 0.6;
+      ctx.save(); ctx.translate(b.x, b.y + Math.sin(b.t * 2) * 5); ctx.scale(b.dir, 1);
+      ctx.strokeStyle = '#3a4150'; ctx.lineWidth = 2 / cam.scale; ctx.fillStyle = '#f4f6fa';
+      ctx.beginPath(); ctx.moveTo(-16, -4 + flap * 12); ctx.quadraticCurveTo(-7, -2, 0, 0); ctx.quadraticCurveTo(7, -2, 16, -4 + flap * 12); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0, 0, 6, 2.6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    });
+  }
+
   function oarFish(len, d, t, lw) {
     var L = len / 2, Hh = Math.max(2, len * d.hr / 2), wv = Math.sin(t * 2) * Hh * 0.4;
     ctx.fillStyle = d.fin;
@@ -379,6 +457,9 @@
     else if (shape === 'lure') lureFish(len, d, t, lw);
     else if (shape === 'lantern') lanternFish(len, d, t, lw);
     else if (shape === 'oar') oarFish(len, d, t, lw);
+    else if (shape === 'jelly') jellyFish(len, d, t, lw);
+    else if (shape === 'turtle') turtleShape(len, d, t, lw);
+    else if (shape === 'crab') crabShape(len, d, t, lw);
     else genericFish(len, d.hr || 0.5, d, t, lw);
     ctx.restore();
   }
@@ -406,6 +487,7 @@
     r.y = r.info.H / 2;
     r.npcs.forEach(function (o, i) { o.x = wrapX(r.x + offs[i]); o.anchor = { x: o.x, y: o.anchor.y }; });
     r.anemones = makeAnemones(r.info);
+    r.birds = makeBirds(r.info);
     r.flora = makeFlora(r.info);
     r.vx = 0;
     r.vy = 0;
@@ -704,8 +786,24 @@
   function denseOn() {
     try { return localStorage.getItem('fish_dense') !== 'off'; } catch (e) { return true; }
   }
+  // v0.11: a few turtles, crabs and jellyfish for each level, so the sea is busier than fish alone.
+  // Each kind has a target; a new one comes in at most one per refill, and only from its own tier on.
+  var CREATURE_TARGETS = [['turtle', function (n) { return 1 + Math.floor(n / 4); }],
+    ['crab', function (n) { return 3 + Math.floor(n / 2); }],
+    ['moon', function (n) { return 1 + Math.floor(n / 3); }]];
+  function fillCreatures() {
+    var r = run, n = r.info.n;
+    CREATURE_TARGETS.forEach(function (c) {
+      var sp = SPECIES.filter(function (x) { return x.id === c[0]; })[0];
+      if (!sp || sp.tier > n) return;
+      var have = r.npcs.filter(function (o) { return !o.dead && o.sp.id === sp.id; }).length;
+      if (have < c[1](n)) spawnNPC(sp, false);
+    });
+  }
+
   function fillPopulations(initial) {
     var r = run, n = r.info.n, counts = {}, i;
+    fillCreatures();
     var dense = denseOn() ? 4 : 1;   // (3200 x 2000) / (1600 x 1000) = 4
     // Food first: plankton from tier 1, krill from tier 2.
     r.npcs.forEach(function (o) { if (!o.dead) counts[o.sp.id] = (counts[o.sp.id] || 0) + 1; });
@@ -951,6 +1049,7 @@
     n.vy += (dvy - n.vy) * Math.min(1, dt * k);
     n.x = wrapX(n.x + n.vx * dt + currentAt(n.y) * dt);
     n.y = clamp(n.y + n.vy * dt, 20, bedY(n.x) - 10);
+    if (sp.bed) n.y = bedY(n.x) - 12;   // v0.11: crabs walk the seabed
     if (Math.abs(n.vx) > 3) n.facing = n.vx > 0 ? 1 : -1;
   }
 
@@ -1051,6 +1150,11 @@
       if (r.size >= n.size * 1.15) { r.biteT = Math.max(r.biteT, BITE_S); eatNPC(n); }
       return;
     }
+    // v0.11: a jellyfish stings you on contact, every 1.5 s, and cannot be eaten. Hidden under an anemone, you are safe.
+    if (sp.sting) {
+      if (n.biteT <= 0 && !r.hidden) { n.biteT = 1.5; hurt(n, 2); if (mode !== 'play' || run !== r) return; }
+      return;
+    }
     // v0.10: a fight with a fish of any size. Each side bites on its own timer, for its attack value.
     // Hidden under an anemone, the fish cannot bite you; you can still bite it.
     if (canBite(sp) && !r.hidden && n.biteT <= 0) {
@@ -1111,6 +1215,7 @@
     updatePlayer(dt);
 
     updatePods();
+    updateBirds(dt);
     r.spawnT = (r.spawnT || 0) - dt;
     if (r.spawnT <= 0) { r.spawnT = 1.2; fillPopulations(false); }
 
@@ -1305,6 +1410,7 @@
     drawSeabed(run.info.zone);
     drawFlora(t);
     (run.anemones || []).forEach(function (a) { drawAnemone(viewX(a.x), a.y, t); });
+    drawBirds();
 
     var list = run.npcs.slice();
     var playerVisible = !(run.inv > 0 && Math.floor(t * 10) % 2 === 0);
@@ -1501,6 +1607,7 @@
     run.x = run.info.W / 2;
     run.y = run.info.H / 2;
     run.anemones = makeAnemones(run.info);
+    run.birds = makeBirds(run.info);
     run.flora = makeFlora(run.info);
     cam.x = run.x;
     cam.y = run.y;
@@ -1800,9 +1907,19 @@
   requestAnimationFrame(frame);
   // Test hook (used by the headless checks): jump to a size and apply the level rules.
   // Test hook (v0.10): a fish of the given size placed beside you, to check fights. The last one is read back by state().
-  var testFish = null;
+  var testFish = null, testCreature = null;
   window.FishGame = {
     resize: resize,
+    // Test hook (v0.11): a creature of the given species id placed beside you. Read back through state().testCreature.
+    debugSpawnCreature: function (id) {
+      if (!run || mode !== 'play') return;
+      var sp = SPECIES.filter(function (x) { return x.id === id; })[0];
+      if (!sp) return;
+      spawnNPC(sp, false);
+      var f = run.npcs[run.npcs.length - 1];
+      f.x = run.x + 40; f.y = run.y; f.arrive = 0; f.anchor = { x: f.x, y: f.y };
+      testCreature = f;
+    },
     debugSpawnBeside: function (size) {
       if (!run || mode !== 'play') return;
       var f = { sp: { id: 'test', name: 'Test fish', tier: run.info.n, kind: 'hunter', temper: 'wary', shape: 'round', size: size, speed: 60, col: '#8a8a8a' },
@@ -1838,7 +1955,12 @@
         chum: run ? run.npcs.filter(function (o) { return o.sp === CHUM; }).length : 0, hp: run && run.hp, maxHp: run && run.maxHp,
         player: run && { x: run.x, y: run.y }, cam: { x: cam.x, y: cam.y, scale: cam.scale },
         hunters: run ? run.npcs.filter(function (o) { return o.sp.kind === 'hunter'; }).map(function (o) { return { x: o.x, y: o.y, size: o.size, locked: o.locked }; }) : [],
-        testFish: testFish ? { x: testFish.x, y: testFish.y, hp: testFish.hp, maxHp: testFish.maxHp, dead: !!testFish.dead } : null
+        testFish: testFish ? { x: testFish.x, y: testFish.y, hp: testFish.hp, maxHp: testFish.maxHp, dead: !!testFish.dead } : null,
+        testCreature: testCreature ? { x: testCreature.x, y: testCreature.y, hp: testCreature.hp, dead: !!testCreature.dead } : null,
+        birds: run && run.birds ? run.birds.length : null,
+        creatures: run ? { turtle: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'turtle'; }).length,
+          crab: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'crab'; }).length,
+          moon: run.npcs.filter(function (o) { return !o.dead && o.sp.id === 'moon'; }).length } : null
       };
     }
   };

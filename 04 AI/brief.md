@@ -57,3 +57,4 @@ The user wants this milestone to push four things. See `.claude/skills/fishes-se
 4. **Smarter sea creatures:** a few legible behaviours (flee, school, ambush, follow chum) that come from species data.
 
 Open questions for the user: art direction (two options each), how far to push the frame budget on older iPads, and which element to build first.
+- **Creatures (v0.11):** turtle and crab (tier 1, harmless, never hunt; crabs keep to the seabed), moon jellyfish (tier 3, harmless kind with `sting: true`: touching one costs 2 health every 1.5 s, and it cannot be eaten or bitten by you). Gulls are scenery only, in `run.birds`, shown when you are near the surface. A few of each are kept per level by `fillCreatures`. Options not taken: stinging or biting turtles, seabirds that dive for fish.
