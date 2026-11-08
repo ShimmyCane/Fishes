@@ -56,7 +56,7 @@
       real: 'A sock that does not belong in the ocean.' },
     { id: 'underwear', name: 'Underwear', tier: 1, kind: 'harmless', temper: 'docile', shape: 'trash', trashKind: 'underwear', hr: 0.3, size: 2, speed: 8, col: '#f2a7c3', fin: '#c97a9b', sting: true, trash: true,
       real: 'Underwear, floating where it should not be.' },
-    { id: 'toycar', name: 'Toy car', tier: 1, kind: 'harmless', temper: 'docile', shape: 'trash', trashKind: 'toycar', hr: 0.4, size: 1.6, speed: 8, col: '#e64b3c', fin: '#333a44', sting: true, trash: true,
+    { id: 'toycar', name: 'Toy car', tier: 1, kind: 'harmless', temper: 'docile', shape: 'trash', trashKind: 'toycar', hr: 0.4, size: 4.8, speed: 8, col: '#e64b3c', fin: '#333a44', sting: true, trash: true,
       real: 'A plastic toy car.' },
     { id: 'bottle', name: 'Plastic bottle', tier: 1, kind: 'harmless', temper: 'docile', shape: 'trash', trashKind: 'bottle', hr: 0.3, size: 2.2, speed: 6, col: '#bfe6ff', fin: '#7fb8e0', sting: true, trash: true,
       real: 'A plastic bottle.' },

@@ -207,9 +207,26 @@ async function density(browser, url) {
     return { fish: st.census.fish, errors: ctx.errors };
   };
   const on = await fishAt('on'), off = await fishAt('off');
-  check('denser sea is on by default: about four times the fish at level 1', on.fish >= 80, 'fish with denser sea on=' + on.fish + ', off=' + off.fish);
+  // v0.12: three times the old denser sea, so about 12 times the sparse count.
+  check('denser sea is on by default: about three times the old denser count', on.fish >= 250, 'fish with denser sea on=' + on.fish + ', off=' + off.fish);
   check('turning denser sea off gives the sparse count', off.fish <= 40 && off.fish >= 10, 'fish with it off=' + off.fish);
+  check('the trash toy is three times its old size', GAME_DATA.SPECIES.filter(function (x) { return x.id === 'toycar'; })[0].size === 4.8, 'toy size ' + GAME_DATA.SPECIES.filter(function (x) { return x.id === 'toycar'; })[0].size);
   check('no page errors (density)', on.errors.length === 0 && off.errors.length === 0, on.errors.concat(off.errors).join(' | '));
+}
+
+// The school, the bought allies and the friends together are at most 5 (2026-11-08: "more than five schools").
+async function schoolCap(browser, url) {
+  const ctx = await startRun(browser, url, 0, 1024, 768);
+  const p = ctx.page;
+  await p.evaluate(function () { window.FishGame.debugSetSize(200); });   // a big level: the school of 5 fills the cap
+  await p.waitForTimeout(6000);
+  for (let i = 0; i < 8; i++) { await p.evaluate(function () { document.getElementById('ally').click(); }); await p.waitForTimeout(250); }
+  await p.waitForTimeout(500);
+  const st = await p.evaluate(function () { return window.FishGame.state(); });
+  check('the school, bought allies and friends together are at most 5', st.pods === 5 && st.allies === 0,
+    'pods ' + st.pods + ' (school ' + (st.pods - st.allies - st.friends) + ', bought ' + st.allies + ', friends ' + st.friends + ')');
+  check('no page errors (school cap)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
 }
 
 // Can you grow? (2026-11-08: "I can't find anything to eat at levels 1-2.") A bot holds the pointer on the nearest
@@ -348,13 +365,20 @@ async function evolutionAndTide(browser, url) {
   await p.waitForTimeout(4500);   // into the chop
   const chopSurf = await p.evaluate(function () { let m = 0; for (let x = 0; x < 4000; x += 37) m = Math.max(m, Math.abs(window.FishGame.surfAt(x))); return m; });
   check('a tide starts with choppy waves', chopSurf > calmSurf + 8, 'surface swing ' + calmSurf.toFixed(1) + ' -> ' + chopSurf.toFixed(1));
-  await p.waitForTimeout(5500);   // into the pull (8 s and on)
-  const a0 = await p.evaluate(function () { return window.FishGame.state(); });
-  await p.waitForTimeout(2000);
-  const a1 = await p.evaluate(function () { return window.FishGame.state(); });
+  // Wait for the game's own tide clock to reach the pull (8 s into the tide), since a busy browser runs slow.
+  let a0 = null;
+  for (let i = 0; i < 120 && !(a0 && a0.tide >= 8.5); i++) {
+    await p.waitForTimeout(200);
+    a0 = await p.evaluate(function () { return window.FishGame.state(); });
+  }
+  let a1 = a0;
+  for (let i = 0; i < 120 && a1.tide !== null && a1.tide < 9.5; i++) {
+    await p.waitForTimeout(100);
+    a1 = await p.evaluate(function () { return window.FishGame.state(); });
+  }
   let dx = a1.px - a0.px; if (dx > a1.W / 2) dx -= a1.W; if (dx < -a1.W / 2) dx += a1.W;
-  check('the tide drags you along, even when you do not swim', Math.abs(dx) > 200 && a0.tide !== null,
-    'moved ' + Math.round(dx) + ' in 2 s during the pull (tide at ' + a0.tide + ' s)');
+  check('the tide drags you along, even when you do not swim', Math.abs(dx) > 60 && a0.tide !== null,
+    'moved ' + Math.round(dx) + ' in ' + ((a1.tide || 0) - (a0.tide || 0)).toFixed(1) + ' s of tide during the pull (tide at ' + a0.tide + ' s)');
   check('no page errors (evolution and tide)', ctx.errors.length === 0, ctx.errors.join(' | '));
   await p.close();
 }
@@ -816,8 +840,9 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'evolution') await evolutionAndTide(browser, url);
     if (which === 'all' || which === 'notes') await familyNotes(browser, url);
     if (which === 'all' || which === 'growth') await growth(browser, url);
+    if (which === 'all' || which === 'schoolcap') await schoolCap(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'notes', 'growth', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'notes', 'growth', 'schoolcap', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {

@@ -3,6 +3,9 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.12 — unreleased
+- The trash toy is three times as large by default.
+- The denser sea has three times the fish it had (about 250 at level 1, up from about 100).
+- The school, bought allies and friends together are at most 5. Before, bought allies and friends could be added on top of a full school of 5, so you could see more than five at once. Buying an ally when the school is full says "Your school is full (5)".
 - The title screen and Settings now show a build stamp after the version (for example "build 2026-11-08.1"). If yours shows an older build, reload the page: an iPad can keep an old copy of the game. The game now asks the browser for fresh files on every new build.
 - Fixed: at levels 1 to 4 you could not eat any fish, only plankton (the half-your-size rule left nothing). There is no size limit on levels 1 to 4 now; it starts at level 5.
 - The tide now pulls your school and friends away from you: in the pull they barely steer and swim weakly, and they regroup when it eases.

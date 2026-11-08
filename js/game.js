@@ -797,6 +797,9 @@
   }
 
   // bought: an ally from the ally button (it does not count toward the school's level-based members).
+  // v0.12 school cap: school, bought allies and friends together never exceed POD_CAP (5). Each spawn checks it.
+  var POD_CAP = 5;
+  function podCount() { return run.npcs.filter(function (o) { return o.pod && !o.dead; }).length; }
   function spawnPod(bought) {
     var r = run, a = rand(0, Math.PI * 2);
     if (!bought) r.podSpawns = (r.podSpawns || 0) + 1;
@@ -812,7 +815,7 @@
 
   function updatePods() {
     var r = run, want = podTarget();
-    while ((r.podSpawns || 0) < want) spawnPod();   // only new levels add members; eaten ones stay gone
+    while ((r.podSpawns || 0) < want && podCount() < POD_CAP) spawnPod();   // only new levels add members; eaten ones stay gone
   }
 
   // Allies (v0.9): one EXP (size) buys an allied fish. Each living ally adds one to the price,
@@ -860,7 +863,7 @@
       var sum = lenFor(P, 'round') + lenFor(o.size, o.sp.shape), d = distW(o, r);
       if (!eligible || d < sum * 0.36 || d > sum * 0.9) { o.greetT = 0; return; }
       o.greetT = (o.greetT || 0) + dt;
-      if (o.greetT >= FRIEND_S && followerMass() + o.size <= ALLY_LIMIT * P) joinFriend(o);
+      if (o.greetT >= FRIEND_S && followerMass() + o.size <= ALLY_LIMIT * P && podCount() < POD_CAP) joinFriend(o);
     });
   }
   function buyAlly() {
@@ -870,6 +873,7 @@
     if (run.size - cost < run.info.enterSize) { floatText(run.x, run.y, 'Not enough EXP left on this level'); return; }
     // v0.12: an ally would be as big as half of you; refuse it if the followers would go over the limit.
     if (followerMass() + Math.max(0.5, run.size * 0.5) > ALLY_LIMIT * run.size) { floatText(run.x, run.y, 'Your allies are full'); return; }
+    if (podCount() >= POD_CAP) { floatText(run.x, run.y, 'Your school is full (5)'); return; }
     run.size -= cost;
     run.allySpent = (run.allySpent || 0) + cost;   // test hook: what buys have charged in total
     spawnPod(true);
@@ -1134,7 +1138,7 @@
   function fillPopulations(initial) {
     var r = run, n = r.info.n, counts = {}, i;
     fillCreatures();
-    var dense = denseOn() ? 4 : 1;   // (3200 x 2000) / (1600 x 1000) = 4
+    var dense = denseOn() ? 12 : 1;   // v0.12: three times the fish of the old denser sea (4 x 3)
     // Food first: plankton from tier 1, krill from tier 2.
     r.npcs.forEach(function (o) { if (!o.dead) counts[o.sp.id] = (counts[o.sp.id] || 0) + 1; });
     SPECIES.forEach(function (sp) {
@@ -1454,7 +1458,7 @@
     if (n.sp === CHUM) {
       var pod = run.npcs.filter(function (o) { return o.pod && !o.dead && distW(o, n) < 240; });
       var members = run.npcs.filter(function (o) { return o.pod && !o.dead; }).length;
-      if (pod.length && (run.podSpawns || 0) < 5 && Math.random() < 0.5) spawnPod();   // fed chum: the group grows
+      if (pod.length && (run.podSpawns || 0) < 5 && podCount() < POD_CAP && Math.random() < 0.5) spawnPod();   // fed chum: the group grows
     }
     checkGrowth();
   }
