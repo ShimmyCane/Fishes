@@ -212,6 +212,41 @@ async function density(browser, url) {
   check('no page errors (density)', on.errors.length === 0 && off.errors.length === 0, on.errors.concat(off.errors).join(' | '));
 }
 
+// Can you grow? (2026-11-08: "I can't find anything to eat at levels 1-2.") A bot holds the pointer on the nearest
+// thing you can eat, as a finger does in tap-and-move, on a phone-sized screen. It must reach level 2 in 100 s.
+// Also: every script and style link carries the build stamp, so a device does not keep an old cached copy.
+async function growth(browser, url) {
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const links = (html.match(/(?:src|href)="(?:js|css)\/[^"]+"/g) || []);
+  const stale = links.filter(function (l) { return l.indexOf('?b=' + GAME_DATA.CONFIG.BUILD + '"') < 0; });
+  check('every script and style link carries the build stamp', links.length >= 6 && stale.length === 0,
+    links.length + ' links, build ' + GAME_DATA.CONFIG.BUILD + (stale.length ? ', stale: ' + stale.join(' ') : ''));
+
+  const W = 390, H = 844;
+  const ctx = await startRun(browser, url, 0, W, H);
+  const p = ctx.page;
+  const title = await p.evaluate(function () { return document.getElementById('title-version').textContent; });
+  check('the title shows the build', title.indexOf('build ' + GAME_DATA.CONFIG.BUILD) >= 0, title);
+  const t0 = Date.now();
+  let st = null, down = false, firstNear = null;
+  while (Date.now() - t0 < 100000) {
+    const g = await p.evaluate(function () { return { t: window.FishGame.debugTarget(), s: window.FishGame.state() }; });
+    st = g.s;
+    if (firstNear === null && g.t) firstNear = g.t.near;
+    if (st.mode !== 'play' || st.level >= 2) break;
+    let x = W / 2, y = H / 4;
+    if (g.t && g.t.target) { x = g.t.target.sx; y = g.t.target.sy; }
+    await p.mouse.move(Math.max(5, Math.min(W - 5, x)), Math.max(5, Math.min(H - 5, y)));
+    if (!down) { await p.mouse.down(); down = true; }
+    await p.waitForTimeout(120);
+  }
+  const secs = Math.round((Date.now() - t0) / 1000);
+  check('you can find food and grow from level 1 to level 2 (bot, 390x844)', st.level >= 2,
+    'level ' + st.level + ' size ' + st.size.toFixed(1) + ' after ' + secs + ' s, eaten ' + st.eaten + ', edible things within 600 at the start: ' + firstNear);
+  check('no page errors (growth)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
 // Family notes (2026-11-08): you can eat at level 1, the tide scatters your school, and landscape matches portrait.
 async function familyNotes(browser, url) {
   // At level 1 every wild fish is under half your size; there is no size floor there, so a neon tetra is food.
@@ -780,8 +815,9 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'edible') await edibleRules(browser, url);
     if (which === 'all' || which === 'evolution') await evolutionAndTide(browser, url);
     if (which === 'all' || which === 'notes') await familyNotes(browser, url);
+    if (which === 'all' || which === 'growth') await growth(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'notes', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'notes', 'growth', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {
