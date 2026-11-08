@@ -3,6 +3,8 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.12 — unreleased
+- Fixed: on tablets the Sprint button was about twice as large as Ally and Attack. All three are now the same size. (Ally and Attack were overriding the tablet size.)
+- The mini map is at the top right, a quarter of the screen wide, with the hearts and timer card under it. On short landscape phones it stays top left, with the card top right.
 - The trash toy is three times as large by default.
 - The denser sea has three times the fish it had (about 250 at level 1, up from about 100).
 - The school, bought allies and friends together are at most 5. Before, bought allies and friends could be added on top of a full school of 5, so you could see more than five at once. Buying an ally when the school is full says "Your school is full (5)".

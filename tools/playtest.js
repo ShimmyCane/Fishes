@@ -74,8 +74,9 @@ async function layout(browser, url) {
   for (const [w, h] of sizes) {
     const ctx = await startRun(browser, url, 0, w, h, 'joystick');
     const rects = await ctx.page.evaluate(function () {
-      return ['joy', 'ally', 'attack', 'sprint', 'gear', 'hud', 'minimap'].map(function (id) {
-        const e = id === 'hud' ? document.querySelector('.hud') : document.getElementById(id);
+      // The HUD is two cards (the level card and the hearts and timer card); the bar itself spans the screen.
+      return ['joy', 'ally', 'attack', 'sprint', 'gear', 'hudL', 'hudR', 'minimap'].map(function (id) {
+        const e = id === 'hudL' ? document.querySelector('.hud-card:not(.hud-right)') : id === 'hudR' ? document.querySelector('.hud-right') : document.getElementById(id);
         const b = e.getBoundingClientRect();
         return { id: id, l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width };
       });
@@ -212,6 +213,30 @@ async function density(browser, url) {
   check('turning denser sea off gives the sparse count', off.fish <= 40 && off.fish >= 10, 'fish with it off=' + off.fish);
   check('the trash toy is three times its old size', GAME_DATA.SPECIES.filter(function (x) { return x.id === 'toycar'; })[0].size === 4.8, 'toy size ' + GAME_DATA.SPECIES.filter(function (x) { return x.id === 'toycar'; })[0].size);
   check('no page errors (density)', on.errors.length === 0 && off.errors.length === 0, on.errors.concat(off.errors).join(' | '));
+}
+
+// v0.12 layout (2026-11-08): sprint is the same size as Ally and Attack; the mini map is at most a quarter of the screen
+// wide, top right, with the hearts and timer card under it.
+async function buttonsAndMap(browser, url) {
+  const sizes = [[1024, 768], [768, 1024], [390, 844], [844, 390]];
+  for (const [w, h] of sizes) {
+    const ctx = await startRun(browser, url, 0, w, h, 'joystick');
+    const r = await ctx.page.evaluate(function () {
+      const box = function (sel) { const b = document.querySelector(sel).getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
+      return { sprint: box('#sprint'), ally: box('#ally'), attack: box('#attack'), map: box('#minimap'), card: box('.hud-right') };
+    });
+    const same = Math.abs(r.sprint.w - r.ally.w) < 1 && Math.abs(r.sprint.h - r.ally.h) < 1 && Math.abs(r.attack.w - r.ally.w) < 1 && Math.abs(r.attack.h - r.ally.h) < 1;
+    check('sprint is the same size as Ally and Attack at ' + w + 'x' + h, same,
+      'sprint ' + r.sprint.w.toFixed(0) + 'x' + r.sprint.h.toFixed(0) + ', ally ' + r.ally.w.toFixed(0) + 'x' + r.ally.h.toFixed(0) + ', attack ' + r.attack.w.toFixed(0) + 'x' + r.attack.h.toFixed(0));
+    const short = h <= 500;   // short landscape phones: the mini map is top left and the card stays top right
+    check('the mini map is at most a quarter of the screen wide at ' + w + 'x' + h + (short ? ' (top left)' : ' (top right)'),
+      r.map.w <= w / 4 + 1 && (short ? r.map.l < w / 2 : r.map.r >= w - 14 && r.map.l > w / 2),
+      'map ' + r.map.w.toFixed(0) + ' px wide (a quarter is ' + (w / 4).toFixed(0) + ')');
+    check('the hearts and timer card is ' + (short ? 'top right, clear of the mini map' : 'under the mini map, on the right') + ' at ' + w + 'x' + h,
+      short ? r.card.l > w / 2 : (r.card.t >= r.map.b - 1 && r.card.l > w / 2),
+      'map bottom ' + r.map.b.toFixed(0) + ', card top ' + r.card.t.toFixed(0) + ', card left ' + r.card.l.toFixed(0));
+    await ctx.page.close();
+  }
 }
 
 // The school, the bought allies and the friends together are at most 5 (2026-11-08: "more than five schools").
@@ -593,8 +618,9 @@ async function backgroundItems(browser, url) {
   await p.setViewportSize({ width: 390, height: 844 });
   await p.waitForTimeout(300);
   const phone = await p.evaluate(function () { return document.getElementById('minimap').getBoundingClientRect().width; });
-  check('the mini map is bigger on a tablet (440 px wide; 170 on a phone)',
-    Math.round(tablet) === 440 && Math.round(phone) === 170, 'tablet ' + Math.round(tablet) + ' px, phone ' + Math.round(phone) + ' px');
+  // v0.12: the mini map is a quarter of the screen wide (it used to be a fixed 440 px on a tablet).
+  check('the mini map is a quarter of the screen wide (tablet 768, phone 390)',
+    Math.abs(tablet - 192) < 2 && Math.abs(phone - 97.5) < 2, 'tablet ' + Math.round(tablet) + ' px of 768, phone ' + Math.round(phone) + ' px of 390');
   await p.close();
 }
 
@@ -841,8 +867,9 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'notes') await familyNotes(browser, url);
     if (which === 'all' || which === 'growth') await growth(browser, url);
     if (which === 'all' || which === 'schoolcap') await schoolCap(browser, url);
+    if (which === 'all' || which === 'buttons') await buttonsAndMap(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'notes', 'growth', 'schoolcap', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'notes', 'growth', 'schoolcap', 'buttons', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {
