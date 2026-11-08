@@ -964,10 +964,13 @@
       tx = r.x + Math.cos(n.podA + n.t * 0.5) * 90; ty = r.y + Math.sin(n.podA + n.t * 0.5) * 90; s = 200;
     }
     var tdx = dxW(tx, n.x), tdy = ty - n.y, dd = Math.hypot(tdx, tdy) || 1;
-    n.vx += (tdx / dd * s - n.vx) * Math.min(1, dt * 4);
-    n.vy += (tdy / dd * s - n.vy) * Math.min(1, dt * 4);
+    // v0.12: in the tide's pull your school and friends barely steer and swim weakly, so the tide takes them away.
+    var pull = tideLevels().pull, hold = 1 - 0.9 * pull;
+    s *= 1 - 0.7 * pull;
+    n.vx += (tdx / dd * s - n.vx) * Math.min(1, dt * 4 * hold);
+    n.vy += (tdy / dd * s - n.vy) * Math.min(1, dt * 4 * hold);
     n.x = wrapX(n.x + n.vx * dt); n.y = clamp(n.y + n.vy * dt, 20, bedY(n.x) - 10);
-    tideNudge(n, dt, 1.2);   // v0.12: the tide scatters your school
+    tideNudge(n, dt, 1.8);   // v0.12: the tide pulls your school and friends further than you, so they scatter
     if (Math.abs(n.vx) > 3) n.facing = n.vx > 0 ? 1 : -1;
   }
 
@@ -1485,7 +1488,8 @@
   // v0.12: you eat plankton, krill and chum only up to level 4 (the start food). A fish under half your size is not food.
   var FOOD_LAST_LEVEL = 4, EDIBLE_MIN = 0.5;
   // v0.12: fish under this share of your size are not food. Half your size up to level 10, then 80%.
-  function edibleMin() { return run.info.n > 10 ? 0.8 : EDIBLE_MIN; }
+  // Levels 1-4 have no floor: there every wild fish is under half your size, so a floor left only plankton to eat.
+  function edibleMin() { return run.info.n > 10 ? 0.8 : run.info.n >= 5 ? EDIBLE_MIN : 0; }
   function checkContact(n) {
     var r = run, sp = n.sp;
     if (n.pod) return;          // your school neither hurts you nor is eaten by you
@@ -1924,8 +1928,9 @@
     var phone = Math.min(CW, CH) < 600 ? 2.5 : 1;   // phones: everything in play is 2.5x larger
     var ZOOM = 3;                                    // v0.11: the whole world is drawn 3x larger (was 4x: zoomed out 25%); the camera follows the fish
     var t = clamp((r.info.n - 1) / 19, 0, 1);        // 0 at level 1, 1 at level 20
-    // At level 1 the view is 930 x 578 (900 + 10 x 3, 560 + 6 x 3, the start size); the scale there is the base.
-    var base = Math.min(CW / 930, CH / 578) * phone * ZOOM;
+    // At level 1 the short side of the screen shows 930 world units; the scale there is the base. v0.12: it comes from
+    // the short side, so the fish is the same size in portrait and landscape (landscape used the height and came out bigger).
+    var base = Math.min(CW, CH) / 930 * phone * ZOOM;
     var want = base * lenFor(D.START_SIZE, 'round') / lenFor(r.size, 'round') * (1 + FISH_GROWTH * t);
     var least = CW * phone * ZOOM / (0.9 * r.info.W);   // the smallest scale that keeps the view inside 90% of the sea
     cam.scale = Math.max(want, least);
@@ -2472,6 +2477,7 @@
         forests: run && run.flora ? run.flora.filter(function (f) { return f.forest; }).length : null,
         calm: run ? +(run.calmT || 0).toFixed(2) : null, bedNear: run ? Math.round(bedY(run.x)) : null,
         morphing: run ? run.npcs.filter(function (o) { return o.morph && !o.dead; }).length : null,
+        podDist: run ? (function () { var ps = run.npcs.filter(function (o) { return o.pod && !o.dead; }); return ps.length ? Math.round(ps.reduce(function (a, o) { return a + distW(o, run); }, 0) / ps.length) : null; })() : null,
         H: run ? run.info.H : null, path: run ? (run.path || []).map(function (p) { return p.id; }) : null,
         formBuild: run && run.form ? run.form.build || 'all-round' : null, style: run ? run.style || null : null,
         tide: run && run.tide ? +run.tide.t.toFixed(2) : null,

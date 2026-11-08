@@ -212,6 +212,63 @@ async function density(browser, url) {
   check('no page errors (density)', on.errors.length === 0 && off.errors.length === 0, on.errors.concat(off.errors).join(' | '));
 }
 
+// Family notes (2026-11-08): you can eat at level 1, the tide scatters your school, and landscape matches portrait.
+async function familyNotes(browser, url) {
+  // At level 1 every wild fish is under half your size; there is no size floor there, so a neon tetra is food.
+  const ctx = await startRun(browser, url, 0, 1024, 768);
+  const p = ctx.page;
+  await p.evaluate(function () { window.FishGame.debugSpawnCreature('neon'); });
+  for (let i = 0; i < 12; i++) {
+    await p.evaluate(function () { const c = window.FishGame.state().testCreature; if (c && !c.dead) window.FishGame.debugMove(c.x, c.y); });
+    await p.waitForTimeout(250);
+  }
+  const eat = await p.evaluate(function () { return window.FishGame.state(); });
+  check('at level 1 you can eat a small fish (a neon tetra)', eat.testCreature && eat.testCreature.dead,
+    'level ' + eat.level + ', size ' + eat.size.toFixed(1) + ', neon dead=' + (eat.testCreature && eat.testCreature.dead));
+
+  check('no page errors (eating at level 1)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+
+  // The tide's pull carries your school away from you; they regroup after. On Calm, so hunters do not eat the school
+  // mid-check (a check that lost its school read 96, then nothing).
+  const tp = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+  const terr = [];
+  tp.on('pageerror', function (e) { terr.push(e.message); });
+  await tp.addInitScript(function () { localStorage.setItem('fish_difficulty', 'calm'); });
+  await tp.goto(url);
+  await tp.click('#btn-play');
+  await tp.waitForTimeout(500);
+  await tp.evaluate(function () { window.FishGame.debugSetSize(95); });   // level 11: your school joins you
+  await tp.waitForTimeout(6000);
+  const before = await tp.evaluate(function () { return window.FishGame.state(); });
+  await tp.evaluate(function () { window.FishGame.debugTide(); });
+  // Read the school's distance through the pull (8-14 s) and keep the furthest; the tide's direction is random.
+  await tp.waitForTimeout(8500);
+  let during = null, far = 0;
+  for (let i = 0; i < 11; i++) {
+    const st = await tp.evaluate(function () { return window.FishGame.state(); });
+    if (st.podDist !== null && st.podDist > far) { far = st.podDist; during = st; }
+    await tp.waitForTimeout(500);
+  }
+  // The rule: at least twice as far as they usually keep (runs read 2.4x to 5x; the sea is random).
+  check('the tide pulls your school away from you (at least twice as far)', before.pods >= 1 && during !== null && far >= 2 * before.podDist,
+    'school ' + before.pods + ': average distance ' + before.podDist + ' -> furthest ' + far + ' (tide at ' + (during && during.tide) + ' s)');
+  check('no page errors (tide and school)', terr.length === 0, terr.join(' | '));
+  await tp.close();
+
+  // The fish is the same size on screen in portrait and landscape (it used to be about 1.6x bigger in landscape).
+  const onScreen = function (st) { return GAME_DATA.fishLen(st.size) * st.cam.scale; };
+  const tall = await startRun(browser, url, 0, 390, 844);
+  const wide = await startRun(browser, url, 0, 844, 390);
+  await tall.page.waitForTimeout(500); await wide.page.waitForTimeout(500);
+  const a = await tall.page.evaluate(function () { return window.FishGame.state(); });
+  const b = await wide.page.evaluate(function () { return window.FishGame.state(); });
+  const ratio = onScreen(b) / onScreen(a);
+  check('the fish is the same size in portrait and landscape', Math.abs(ratio - 1) < 0.03,
+    'portrait ' + onScreen(a).toFixed(0) + ' px, landscape ' + onScreen(b).toFixed(0) + ' px (x' + ratio.toFixed(2) + ')');
+  await tall.page.close(); await wide.page.close();
+}
+
 // v0.12 evolution and the tide. Five forms on every level, a play style that steers which one you become,
 // your form's numbers applied to you, a sea that stays the same height, and a tide that drags you.
 async function evolutionAndTide(browser, url) {
@@ -722,8 +779,9 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'friends') await friendsAndFollowers(browser, url);
     if (which === 'all' || which === 'edible') await edibleRules(browser, url);
     if (which === 'all' || which === 'evolution') await evolutionAndTide(browser, url);
+    if (which === 'all' || which === 'notes') await familyNotes(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'notes', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {
