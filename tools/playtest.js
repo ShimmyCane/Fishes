@@ -74,8 +74,9 @@ async function layout(browser, url) {
   for (const [w, h] of sizes) {
     const ctx = await startRun(browser, url, 0, w, h, 'joystick');
     const rects = await ctx.page.evaluate(function () {
-      return ['joy', 'ally', 'attack', 'sprint', 'gear', 'hud', 'minimap'].map(function (id) {
-        const e = id === 'hud' ? document.querySelector('.hud') : document.getElementById(id);
+      // The HUD is two cards (the level card and the hearts and timer card); the bar itself spans the screen.
+      return ['joy', 'ally', 'attack', 'sprint', 'gear', 'hudL', 'hudR', 'minimap'].map(function (id) {
+        const e = id === 'hudL' ? document.querySelector('.hud-card:not(.hud-right)') : id === 'hudR' ? document.querySelector('.hud-right') : document.getElementById(id);
         const b = e.getBoundingClientRect();
         return { id: id, l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width };
       });
@@ -207,9 +208,50 @@ async function density(browser, url) {
     return { fish: st.census.fish, errors: ctx.errors };
   };
   const on = await fishAt('on'), off = await fishAt('off');
-  check('denser sea is on by default: about four times the fish at level 1', on.fish >= 80, 'fish with denser sea on=' + on.fish + ', off=' + off.fish);
+  // v0.12: three times the old denser sea, so about 12 times the sparse count.
+  check('denser sea is on by default: about three times the old denser count', on.fish >= 250, 'fish with denser sea on=' + on.fish + ', off=' + off.fish);
   check('turning denser sea off gives the sparse count', off.fish <= 40 && off.fish >= 10, 'fish with it off=' + off.fish);
+  check('the trash toy is three times its old size', GAME_DATA.SPECIES.filter(function (x) { return x.id === 'toycar'; })[0].size === 4.8, 'toy size ' + GAME_DATA.SPECIES.filter(function (x) { return x.id === 'toycar'; })[0].size);
   check('no page errors (density)', on.errors.length === 0 && off.errors.length === 0, on.errors.concat(off.errors).join(' | '));
+}
+
+// v0.12 layout (2026-11-08): sprint is the same size as Ally and Attack; the mini map is at most a quarter of the screen
+// wide, top right, with the hearts and timer card under it.
+async function buttonsAndMap(browser, url) {
+  const sizes = [[1024, 768], [768, 1024], [390, 844], [844, 390]];
+  for (const [w, h] of sizes) {
+    const ctx = await startRun(browser, url, 0, w, h, 'joystick');
+    const r = await ctx.page.evaluate(function () {
+      const box = function (sel) { const b = document.querySelector(sel).getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
+      return { sprint: box('#sprint'), ally: box('#ally'), attack: box('#attack'), map: box('#minimap'), card: box('.hud-right') };
+    });
+    const same = Math.abs(r.sprint.w - r.ally.w) < 1 && Math.abs(r.sprint.h - r.ally.h) < 1 && Math.abs(r.attack.w - r.ally.w) < 1 && Math.abs(r.attack.h - r.ally.h) < 1;
+    check('sprint is the same size as Ally and Attack at ' + w + 'x' + h, same,
+      'sprint ' + r.sprint.w.toFixed(0) + 'x' + r.sprint.h.toFixed(0) + ', ally ' + r.ally.w.toFixed(0) + 'x' + r.ally.h.toFixed(0) + ', attack ' + r.attack.w.toFixed(0) + 'x' + r.attack.h.toFixed(0));
+    const short = h <= 500;   // short landscape phones: the mini map is top left and the card stays top right
+    check('the mini map is at most a quarter of the screen wide at ' + w + 'x' + h + (short ? ' (top left)' : ' (top right)'),
+      r.map.w <= w / 4 + 1 && (short ? r.map.l < w / 2 : r.map.r >= w - 14 && r.map.l > w / 2),
+      'map ' + r.map.w.toFixed(0) + ' px wide (a quarter is ' + (w / 4).toFixed(0) + ')');
+    check('the hearts and timer card is ' + (short ? 'top right, clear of the mini map' : 'under the mini map, on the right') + ' at ' + w + 'x' + h,
+      short ? r.card.l > w / 2 : (r.card.t >= r.map.b - 1 && r.card.l > w / 2),
+      'map bottom ' + r.map.b.toFixed(0) + ', card top ' + r.card.t.toFixed(0) + ', card left ' + r.card.l.toFixed(0));
+    await ctx.page.close();
+  }
+}
+
+// The school, the bought allies and the friends together are at most 5 (2026-11-08: "more than five schools").
+async function schoolCap(browser, url) {
+  const ctx = await startRun(browser, url, 0, 1024, 768);
+  const p = ctx.page;
+  await p.evaluate(function () { window.FishGame.debugSetSize(200); });   // a big level: the school of 5 fills the cap
+  await p.waitForTimeout(6000);
+  for (let i = 0; i < 8; i++) { await p.evaluate(function () { document.getElementById('ally').click(); }); await p.waitForTimeout(250); }
+  await p.waitForTimeout(500);
+  const st = await p.evaluate(function () { return window.FishGame.state(); });
+  check('the school, bought allies and friends together are at most 5', st.pods === 5 && st.allies === 0,
+    'pods ' + st.pods + ' (school ' + (st.pods - st.allies - st.friends) + ', bought ' + st.allies + ', friends ' + st.friends + ')');
+  check('no page errors (school cap)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
 }
 
 // Can you grow? (2026-11-08: "I can't find anything to eat at levels 1-2.") A bot holds the pointer on the nearest
@@ -348,13 +390,20 @@ async function evolutionAndTide(browser, url) {
   await p.waitForTimeout(4500);   // into the chop
   const chopSurf = await p.evaluate(function () { let m = 0; for (let x = 0; x < 4000; x += 37) m = Math.max(m, Math.abs(window.FishGame.surfAt(x))); return m; });
   check('a tide starts with choppy waves', chopSurf > calmSurf + 8, 'surface swing ' + calmSurf.toFixed(1) + ' -> ' + chopSurf.toFixed(1));
-  await p.waitForTimeout(5500);   // into the pull (8 s and on)
-  const a0 = await p.evaluate(function () { return window.FishGame.state(); });
-  await p.waitForTimeout(2000);
-  const a1 = await p.evaluate(function () { return window.FishGame.state(); });
+  // Wait for the game's own tide clock to reach the pull (8 s into the tide), since a busy browser runs slow.
+  let a0 = null;
+  for (let i = 0; i < 120 && !(a0 && a0.tide >= 8.5); i++) {
+    await p.waitForTimeout(200);
+    a0 = await p.evaluate(function () { return window.FishGame.state(); });
+  }
+  let a1 = a0;
+  for (let i = 0; i < 120 && a1.tide !== null && a1.tide < 9.5; i++) {
+    await p.waitForTimeout(100);
+    a1 = await p.evaluate(function () { return window.FishGame.state(); });
+  }
   let dx = a1.px - a0.px; if (dx > a1.W / 2) dx -= a1.W; if (dx < -a1.W / 2) dx += a1.W;
-  check('the tide drags you along, even when you do not swim', Math.abs(dx) > 200 && a0.tide !== null,
-    'moved ' + Math.round(dx) + ' in 2 s during the pull (tide at ' + a0.tide + ' s)');
+  check('the tide drags you along, even when you do not swim', Math.abs(dx) > 60 && a0.tide !== null,
+    'moved ' + Math.round(dx) + ' in ' + ((a1.tide || 0) - (a0.tide || 0)).toFixed(1) + ' s of tide during the pull (tide at ' + a0.tide + ' s)');
   check('no page errors (evolution and tide)', ctx.errors.length === 0, ctx.errors.join(' | '));
   await p.close();
 }
@@ -569,8 +618,9 @@ async function backgroundItems(browser, url) {
   await p.setViewportSize({ width: 390, height: 844 });
   await p.waitForTimeout(300);
   const phone = await p.evaluate(function () { return document.getElementById('minimap').getBoundingClientRect().width; });
-  check('the mini map is bigger on a tablet (440 px wide; 170 on a phone)',
-    Math.round(tablet) === 440 && Math.round(phone) === 170, 'tablet ' + Math.round(tablet) + ' px, phone ' + Math.round(phone) + ' px');
+  // v0.12: the mini map is a quarter of the screen wide (it used to be a fixed 440 px on a tablet).
+  check('the mini map is a quarter of the screen wide (tablet 768, phone 390)',
+    Math.abs(tablet - 192) < 2 && Math.abs(phone - 97.5) < 2, 'tablet ' + Math.round(tablet) + ' px of 768, phone ' + Math.round(phone) + ' px of 390');
   await p.close();
 }
 
@@ -816,8 +866,10 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'evolution') await evolutionAndTide(browser, url);
     if (which === 'all' || which === 'notes') await familyNotes(browser, url);
     if (which === 'all' || which === 'growth') await growth(browser, url);
+    if (which === 'all' || which === 'schoolcap') await schoolCap(browser, url);
+    if (which === 'all' || which === 'buttons') await buttonsAndMap(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'notes', 'growth', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'notes', 'growth', 'schoolcap', 'buttons', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {
