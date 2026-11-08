@@ -36,6 +36,7 @@ Add a check for each new rule you add. If a check is flaky, make it test an inva
 
 - Add a `CHANGELOG.md` entry for every user-visible change, under a new heading `## 0.10 — unreleased` until a release. Describe what the player sees, in their words. The version number in `js/species.js` (`VERSION`) changes only at release, and only when the user asks.
 - Add a line to `04 AI/lessons.md` if you hit a surprise a future session would hit too.
+- Change the build stamp on every merge: `BUILD` in `js/species.js` and every `?b=` in `index.html`, to the same value (for example `2026-11-08.2`). Browsers, iPad Safari above all, keep old cached scripts otherwise, and the version label alone cannot tell builds apart. The playtest checks that they match.
 
 ## 5. Commit
 

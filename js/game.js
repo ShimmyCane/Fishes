@@ -2000,8 +2000,8 @@
 
   function showTitle() {
     mode = 'title';
-    $('title-version').textContent = 'Fishes v' + CFG.VERSION + ' · ' + CFG.VERSION_DATE;
-    $('panel-version').textContent = 'Fishes v' + CFG.VERSION + ' · ' + CFG.VERSION_DATE;
+    $('title-version').textContent = 'Fishes v' + CFG.VERSION + ' · ' + CFG.VERSION_DATE + ' · build ' + CFG.BUILD;
+    $('panel-version').textContent = 'Fishes v' + CFG.VERSION + ' · ' + CFG.VERSION_DATE + ' · build ' + CFG.BUILD;
     run = null;
     paused = false;
     hideCard();
@@ -2451,6 +2451,24 @@
     // Test hooks. debugSetSize skips the calm, so a check can set any size; debugGrow goes through the calm rules.
     debugSetSize: function (s) { if (run && mode === 'play') { run.size = s; while (run && mode === 'play' && run.info.n < 20 && run.size >= run.goal) { run.calmT = 0; checkGrowth(); } } },
     debugGrow: function (s) { if (run && mode === 'play') { run.size = s; checkGrowth(); } },
+    // Test hook: the nearest thing you can eat right now and where it is on screen (for a play-test bot), plus how many
+    // edible things are in the sea and within 600 of you.
+    debugTarget: function () {
+      if (!run || mode !== 'play') return null;
+      var r = run, best = null, bd = 1e9, own = playerDesc().id, near = 0, all = 0;
+      r.npcs.forEach(function (o) {
+        if (o.dead || o.pod || o.arrive > 0) return;
+        var sp = o.sp, ok;
+        if (sp.kind === 'food') ok = r.info.n <= FOOD_LAST_LEVEL && r.size >= o.size * 1.15;
+        else ok = sp.kind !== 'harmless' && !sp.sting && sp.id !== own && o.size >= r.size * edibleMin() && o.size <= r.size * 0.87;
+        if (!ok) return;
+        var d = distW(o, r);
+        all++; if (d < 600) near++;
+        if (d < bd) { bd = d; best = o; }
+      });
+      return { all: all, near: near, target: best ? { kind: best.sp.kind, id: best.sp.id, dist: Math.round(bd),
+        sx: CW / 2 + dxW(best.x, cam.x) * cam.scale, sy: CH / 2 + (best.y - cam.y) * cam.scale } : null };
+    },
     debugTide: function () { if (run && mode === 'play') { run.tideNext = run.t; run.calmT = 0; } },
     // Test hook: each form of level n and its chance for a play style (a = biting, s = swimming, h = allies).
     debugFormOdds: function (n, a, s, h) {

@@ -500,6 +500,9 @@
   var CONFIG = {
     VERSION: '0.11',                    // see CHANGELOG.md
     VERSION_DATE: '2026-11-07',
+    // Build stamp: changes on every merge, with the ?b= on the script and style links in index.html. It shows on the title
+    // screen and in Settings, so a device running an old cached copy can be told apart from the current build.
+    BUILD: '2026-11-08.1',
     TIME_LIMIT: 900,                    // hard stop at 15 minutes
     LIVES: 3,
     TENSION: { start: 150, full: 300 }, // harder from 2:30, full by 5:00 (raises the predator share by up to 50%)
