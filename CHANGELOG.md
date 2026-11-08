@@ -3,6 +3,9 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.12 — unreleased
+- Fixed: at levels 1 to 4 you could not eat any fish, only plankton (the half-your-size rule left nothing). There is no size limit on levels 1 to 4 now; it starts at level 5.
+- The tide now pulls your school and friends away from you: in the pull they barely steer and swim weakly, and they regroup when it eases.
+- Landscape and portrait show the fish at the same size. In landscape the fish used to be about 1.6 times bigger.
 - Speed: your swimming speed no longer drops as you grow. It rises 3% a level, so levels 15 to 20 are faster, not slower.
 - Eating: plankton, krill and chum are food only up to level 4. From level 5 on they drift past you.
 - Eating: a fish under half your size is not food for you, and you do not bite it. Small fish can still bite you.
