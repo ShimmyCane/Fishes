@@ -2,7 +2,23 @@
 
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
-## 0.11 — unreleased
+## 0.12 — unreleased
+- Speed: your swimming speed no longer drops as you grow. It rises 3% a level, so levels 15 to 20 are faster, not slower.
+- Eating: plankton, krill and chum are food only up to level 4. From level 5 on they drift past you.
+- Eating: a fish under half your size is not food for you, and you do not bite it. Small fish can still bite you.
+- Easy runs 5 minutes, then it is time's up. Medium, Hard and Calm keep the 15-minute cap.
+- Evolution: every level now has five more species you can become, each with its own bite, speed and health (biter, swift, tough, striker, guard, cruiser). When you level up, your next form is picked at random, but how you have played tips the odds: biting a lot leans to hard bites, swimming a lot to speed, and time with allies near you to health. The banner says what your new form is good at, and the end of a run shows your whole evolution path.
+- The tide: every few minutes the sea turns. First the surface gets choppy, then the water churns, then a strong pull drags every fish, you and your school included, before it eases off.
+- The sea is the same height on every level. Only its width grows, and the camera zooms out instead. Big fish are drawn shorter than before, so the largest fish still fits.
+- Calm also has a 5-minute limit, like Easy.
+- Your school is at most 5 fish. Extra school members never join, so they do not pile up in a fight.
+- You never eat or fight your own species.
+- Above level 10, you only eat fish at least 80% of your size. Up to level 10 the floor is half your size.
+- Health bars show only on fish at least 80% of your size.
+- A friend joining now has a teal ring that grows out and fades as it fades in.
+- Fixed: on Calm, a sea with no food to count could spawn a predator. Found while testing the eating rules.
+
+## 0.11 — 2026-11-07
 - Allies have a limit. Your bought allies and your friends together may be at most twice your size. You cannot buy an ally that would go over it (the sea says "Your allies are full"). If you shrink below it, one follower is released at a time, every 0.6 seconds, until you are under the limit. A released fish goes back to being a wild fish. The school does not count.
 - Friends: swim up to a fish with your body shape that is 90% to 100% of your size, and keep it inside a teal ring just outside your bite range. After three seconds without touching, it joins you and fades in. Touching it, or moving away, starts the wait again. A released friend waits 20 seconds before it can join again. Friends do not raise the price of your next ally.
 - Level-ups now come one at a time, with a calm between them. After each level-up the sea is calm for five seconds: no new fish swim in, nothing can bite you, and you cannot level up again until it is over. Growth past the goal is kept, so the next level comes when the calm ends. Before, a run of meals could carry you from level 10 to level 14 at once.

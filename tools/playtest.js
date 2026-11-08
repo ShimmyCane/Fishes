@@ -17,6 +17,12 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
+// The game's data (species, levels, fishLen), loaded the way the page loads it, so checks use the same numbers.
+const GAME_DATA = (function () {
+  const box = { window: {} };
+  require('vm').runInNewContext(fs.readFileSync(path.join(ROOT, 'js/species.js'), 'utf8'), box);
+  return box.window.FishData;
+})();
 
 function loadPlaywright() {
   try { return require('playwright'); } catch (e) { /* fall through to the global install */ }
@@ -159,8 +165,8 @@ async function camera(browser, url) {
   await p.evaluate(function () { window.FishGame.debugSetSize(400); });   // past the level-20 goal (300)
   await p.waitForTimeout(600);
   const last = await read();
-  // On-screen fish length in pixels: the sprite length (22 + 5 x size, as lenFor in game.js) times the camera scale.
-  const onScreen = function (s) { return (22 + 5 * s.size) * s.cam.scale; };
+  // On-screen fish length in pixels: the sprite length (the game's own fishLen, as lenFor uses) times the camera scale.
+  const onScreen = function (s) { return GAME_DATA.fishLen(s.size) * s.cam.scale; };
   const ratio = onScreen(last) / onScreen(first);
   check('the sea is at least 3000 wide at level 1', first.W >= 3000, 'W=' + first.W);
   check('fish looks 25% bigger by level 20 (interpolated), not more',
@@ -206,14 +212,105 @@ async function density(browser, url) {
   check('no page errors (density)', on.errors.length === 0 && off.errors.length === 0, on.errors.concat(off.errors).join(' | '));
 }
 
+// v0.12 evolution and the tide. Five forms on every level, a play style that steers which one you become,
+// your form's numbers applied to you, a sea that stays the same height, and a tide that drags you.
+async function evolutionAndTide(browser, url) {
+  // Every level has five new forms, plus its first species.
+  const short = [];
+  for (let n = 1; n <= 20; n++) if (GAME_DATA.SPECIES.filter(function (sp) { return sp.tier === n && sp.form; }).length !== 5) short.push(n);
+  check('every level has five forms you can evolve into', short.length === 0, short.length ? 'levels short: ' + short.join(', ') : '20 levels x 5');
+
+  const ctx = await startRun(browser, url, 0, 1024, 768);
+  const p = ctx.page;
+  // A play style steers the odds: biting favours bite builds, swimming fast ones, allies tough ones.
+  const odds = await p.evaluate(function () {
+    const top = function (o) { return Object.keys(o).sort(function (x, y) { return o[y].share - o[x].share; })[0]; };
+    const a = window.FishGame.debugFormOdds(10, 1, 0, 0), s = window.FishGame.debugFormOdds(10, 0, 1, 0), h = window.FishGame.debugFormOdds(10, 0, 0, 1);
+    return { bite: a[top(a)], swim: s[top(s)], ally: h[top(h)] };
+  });
+  check('biting leans to hard bites, swimming to speed, allies to health',
+    odds.bite.atk >= 1.2 && odds.swim.spd >= 1.15 && odds.ally.hp >= 1.25,
+    'biting: ' + odds.bite.build + ' ' + odds.bite.share + ', swimming: ' + odds.swim.build + ' ' + odds.swim.share + ', allies: ' + odds.ally.build + ' ' + odds.ally.share);
+
+  const first = await p.evaluate(function () { return window.FishGame.state(); });
+  await p.evaluate(function () { window.FishGame.debugSetSize(70); });   // level 8
+  await p.waitForTimeout(300);
+  const st = await p.evaluate(function () { return window.FishGame.state(); });
+  const fits = st.path.every(function (id, i) {
+    const sp = GAME_DATA.SPECIES.filter(function (x) { return x.id === id; })[0];
+    return sp && sp.tier === i + 1 && (sp.form || sp === GAME_DATA.leadOf(i + 1));
+  });
+  check('your evolution path has one form for each level you reached', st.path.length === st.level && fits,
+    'level ' + st.level + ', path ' + st.path.join(' > '));
+  const form = GAME_DATA.SPECIES.filter(function (x) { return x.id === st.form; })[0];
+  const wantHp = Math.round(2 * (10 + Math.floor(st.size / 2)) * (form.hp || 1));
+  check("your form's health applies to you", st.maxHp === wantHp,
+    'form ' + st.form + ' (' + st.formBuild + ', hp x' + (form.hp || 1) + '): max health ' + st.maxHp + ', expected ' + wantHp);
+  check('the sea is the same height on every level, and only its width grows',
+    first.H === st.H && st.H === GAME_DATA.levelInfo(20).H && st.W > first.W, 'H ' + first.H + ' -> ' + st.H + ', W ' + first.W + ' -> ' + st.W);
+
+  // The tide: choppy waves first, then a pull that drags you while you do nothing.
+  await p.waitForTimeout(5500);   // the calm after the level-up
+  const calmSurf = await p.evaluate(function () { let m = 0; for (let x = 0; x < 4000; x += 37) m = Math.max(m, Math.abs(window.FishGame.surfAt(x))); return m; });
+  await p.evaluate(function () { window.FishGame.debugTide(); });
+  await p.waitForTimeout(4500);   // into the chop
+  const chopSurf = await p.evaluate(function () { let m = 0; for (let x = 0; x < 4000; x += 37) m = Math.max(m, Math.abs(window.FishGame.surfAt(x))); return m; });
+  check('a tide starts with choppy waves', chopSurf > calmSurf + 8, 'surface swing ' + calmSurf.toFixed(1) + ' -> ' + chopSurf.toFixed(1));
+  await p.waitForTimeout(5500);   // into the pull (8 s and on)
+  const a0 = await p.evaluate(function () { return window.FishGame.state(); });
+  await p.waitForTimeout(2000);
+  const a1 = await p.evaluate(function () { return window.FishGame.state(); });
+  let dx = a1.px - a0.px; if (dx > a1.W / 2) dx -= a1.W; if (dx < -a1.W / 2) dx += a1.W;
+  check('the tide drags you along, even when you do not swim', Math.abs(dx) > 200 && a0.tide !== null,
+    'moved ' + Math.round(dx) + ' in 2 s during the pull (tide at ' + a0.tide + ' s)');
+  check('no page errors (evolution and tide)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
+// v0.12 eating: plankton is food only up to level 4, and a fish under half your size is not food for you.
+async function edibleRules(browser, url) {
+  const ctx = await startRun(browser, url, 70, 1024, 768);   // level 8
+  const p = ctx.page;
+  await p.waitForTimeout(6000);   // the calm after the level-up
+  await p.evaluate(function () { window.FishGame.debugSpawnCreature('plankton'); });
+  await p.evaluate(function () { const c = window.FishGame.state().testCreature; window.FishGame.debugMove(c.x, c.y); });
+  await p.waitForTimeout(800);
+  const food = await p.evaluate(function () { return window.FishGame.state(); });
+  check('plankton is not food at level 8', food.testCreature && !food.testCreature.dead,
+    'level ' + food.level + ', plankton dead=' + (food.testCreature && food.testCreature.dead));
+  // A guppy (0.8) is far under half of your 70: you touch it for four seconds and it is not bitten.
+  await p.evaluate(function () { window.FishGame.debugSpawnCreature('guppy'); });
+  const start = await p.evaluate(function () { return window.FishGame.state().testCreature; });
+  for (let i = 0; i < 16; i++) {
+    await p.evaluate(function () { const c = window.FishGame.state().testCreature; if (c && !c.dead) window.FishGame.debugMove(c.x, c.y); });
+    await p.waitForTimeout(250);
+  }
+  const small = await p.evaluate(function () { return window.FishGame.state().testCreature; });
+  check('a baby fish under half your size is not food for you', !!small && !small.dead && !!start && small.hp >= start.hp,
+    'guppy hp ' + (start && start.hp) + ' -> ' + (small && small.hp) + ', dead=' + (small && small.dead));
+  // You never eat your own species: a fish of your form, touched for a while, is still there.
+  const formId = await p.evaluate(function () { return window.FishGame.state().form; });
+  await p.evaluate(function (id) { window.FishGame.debugSpawnCreature(id); }, formId);
+  const own0 = await p.evaluate(function () { return window.FishGame.state().testCreature; });
+  for (let i = 0; i < 12; i++) {
+    await p.evaluate(function () { const c = window.FishGame.state().testCreature; if (c && !c.dead) window.FishGame.debugMove(c.x, c.y); });
+    await p.waitForTimeout(250);
+  }
+  const own = await p.evaluate(function () { return window.FishGame.state().testCreature; });
+  check('you never eat your own species', !!own && !own.dead && !!own0 && own.hp >= own0.hp,
+    'form ' + formId + ': hp ' + (own0 && own0.hp) + ' -> ' + (own && own.hp) + ', dead=' + (own && own.dead));
+  check('no page errors (edible rules)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
 // v0.12 friends and followers: a similar fish that stays just outside your bite range for 3 s joins you.
 // Touching it resets the wait. Followers over the limit (2 x your size) are released one at a time.
 async function friendsAndFollowers(browser, url) {
   const ctx = await startRun(browser, url, 12, 1024, 768);   // level 2: your form is a slim fish
   const p = ctx.page;
   await p.waitForTimeout(6000);   // the calm after the start
-  // A clownfish is round like your level-2 form (the clownfish) and 11 long against your 12, so it does not flee. Keep it in the friend band (not touching).
-  await p.evaluate(function () { window.FishGame.debugSpawnCreature('clownfish', 11); });
+  // A fish of your own form (same shape as you) and 11 long against your 12, so it does not flee. v0.12: your form is random. Keep it in the friend band (not touching).
+  await p.evaluate(function () { window.FishGame.debugSpawnCreature(window.FishGame.state().form, 11); });
   let st = null;
   for (let i = 0; i < 24; i++) {
     await p.evaluate(function () {
@@ -229,7 +326,7 @@ async function friendsAndFollowers(browser, url) {
     'friends=' + st.friends + ', mass ' + st.followerMass + ' of limit ' + st.followerLimit + ', level ' + st.level);
 
   // Touching resets the wait: a clownfish is kept in the band for 2.4 s, touched once, then in the band for 2.4 s. No friend.
-  await p.evaluate(function () { window.FishGame.debugSpawnCreature('clownfish', 11); });
+  await p.evaluate(function () { window.FishGame.debugSpawnCreature(window.FishGame.state().form, 11); });
   const touchOnce = async function (ms) {
     for (let t = 0; t < ms; t += 250) {
       await p.evaluate(function () {
@@ -623,8 +720,10 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'harmless') await harmlessIsNotFood(browser, url);
     if (which === 'all' || which === 'background') await backgroundItems(browser, url);
     if (which === 'all' || which === 'friends') await friendsAndFollowers(browser, url);
+    if (which === 'all' || which === 'edible') await edibleRules(browser, url);
+    if (which === 'all' || which === 'evolution') await evolutionAndTide(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {
