@@ -7,6 +7,9 @@ Every version the team can open, newest first. The version shows on the title sc
 - Eating: plankton, krill and chum are food only up to level 4. From level 5 on they drift past you.
 - Eating: a fish under half your size is not food for you, and you do not bite it. Small fish can still bite you.
 - Easy runs 5 minutes, then it is time's up. Medium, Hard and Calm keep the 15-minute cap.
+- Evolution: every level now has five more species you can become, each with its own bite, speed and health (biter, swift, tough, striker, guard, cruiser). When you level up, your next form is picked at random, but how you have played tips the odds: biting a lot leans to hard bites, swimming a lot to speed, and time with allies near you to health. The banner says what your new form is good at, and the end of a run shows your whole evolution path.
+- The tide: every few minutes the sea turns. First the surface gets choppy, then the water churns, then a strong pull drags every fish, you and your school included, before it eases off.
+- The sea is the same height on every level. Only its width grows, and the camera zooms out instead. Big fish are drawn shorter than before, so the largest fish still fits.
 - Calm also has a 5-minute limit, like Easy.
 - Your school is at most 5 fish. Extra school members never join, so they do not pile up in a fight.
 - You never eat or fight your own species.

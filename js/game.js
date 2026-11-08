@@ -51,11 +51,45 @@
     return H - 140 + 45 * Math.sin(3 * u + 0.7) + 22 * Math.sin(5 * u + 2.1) + 10 * Math.sin(8 * u);
   }
   function surfY(x) {
-    var W = run.info.W, u = 2 * Math.PI * wrapX(x) / W;
-    return 6 * Math.sin(3 * u) + 3 * Math.sin(7 * u + 1);
+    var W = run.info.W, u = 2 * Math.PI * wrapX(x) / W, chop = run.tide ? tideLevels().chop : 0, T = run.t || 0;
+    // v0.12: during a tide the surface turns choppy (short, fast waves on top of the long swell).
+    return 6 * Math.sin(3 * u) + 3 * Math.sin(7 * u + 1) + chop * (16 * Math.sin(40 * u + T * 5) + 9 * Math.sin(97 * u - T * 7));
   }
   // Sideways drift by depth: bands flow in opposite directions, so the sea moves in layers.
   function currentAt(y) { return 40 * Math.sin(2 * Math.PI * y / (run.info.H * 0.6)); }
+  // v0.12 tide: every few minutes the sea turns. Choppy waves first (0-4 s), then churn (4-8 s), then a pull that
+  // drags every fish, you and your school included (8-14 s), then it eases off (14-17 s).
+  var TIDE_FIRST = 100, TIDE_EVERY = 140, TIDE_S = 17;
+  function ramp(t, a, b) { return clamp((t - a) / (b - a), 0, 1); }
+  function tideLevels() {
+    var td = run && run.tide;
+    if (!td) return { chop: 0, churn: 0, pull: 0 };
+    var t = td.t, fade = 1 - ramp(t, 14, TIDE_S);
+    return { chop: ramp(t, 0, 4) * fade, churn: ramp(t, 4, 8) * fade, pull: ramp(t, 8, 10) * fade };
+  }
+  function updateTide(dt) {
+    var r = run;
+    if (r.tideNext === undefined) r.tideNext = TIDE_FIRST;
+    if (!r.tide && r.t >= r.tideNext && r.calmT <= 0) {
+      r.tide = { t: 0, dir: Math.random() < 0.5 ? -1 : 1 };
+      showBanner('The tide is turning!', 'Choppy water, then churn, then a strong pull. Everyone gets dragged.', 3000);
+    }
+    if (r.tide) {
+      r.tide.t += dt;
+      if (r.tide.t >= TIDE_S) { r.tide = null; r.tideNext = r.t + TIDE_EVERY; }
+    }
+  }
+  function tideDrift(x, y) {
+    var L = tideLevels(), T = run.t, dir = run.tide ? run.tide.dir : 1;
+    return { x: dir * 150 * L.pull + 45 * L.churn * Math.sin(y / 170 + T * 2.1),
+      y: 55 * L.churn * Math.sin(x / 210 + T * 1.7) + 25 * L.pull * Math.sin(T * 1.3 + x / 380) };
+  }
+  function tideNudge(o, dt, k) {
+    if (!run.tide) return;
+    var d = tideDrift(o.x, o.y);
+    o.x = wrapX(o.x + d.x * dt * k);
+    o.y = clamp(o.y + d.y * dt * k, 20, bedY(o.x) - 10);
+  }
   function hopHeight(size) { return clamp(30 + size * 3, 30, 140); }
   // Kelp patches on the seabed: small fish and plankton gather round them, and ambush fish patrol them.
   // v0.11: about twice as much kelp and twice as many anemones as before, so the sea looks lived in.
@@ -74,7 +108,7 @@
   function lenFor(size, shape) {
     if (shape === 'plankton') return 10 + size * 10;
     if (shape === 'krill') return 10 + size * 8;
-    return 22 + size * 5;
+    return D.fishLen(size);   // v0.12: one length for drawing, reach and the camera (see species.js)
   }
 
   function hexMix(a, b, t) {
@@ -86,7 +120,7 @@
   }
 
   // The player takes the form of its tier's lead species (evolution).
-  function playerDesc() { return run ? D.leadOf(run.level) : D.leadOf(1); }
+  function playerDesc() { return run && run.form ? run.form : D.leadOf(run ? run.level : 1); }   // v0.12: your chosen form
 
   // ---------- canvas setup and background ----------
   function resize() {
@@ -610,6 +644,30 @@
   // v0.12 background items (Settings → Background items). On by default.
   function bgOn() { try { return localStorage.getItem('fish_bg') !== 'off'; } catch (e) { return true; } }
 
+  // v0.12 evolution: on each level you become one of its forms (its first species, or one of its five forms),
+  // picked at random but weighted towards how you play. Biting leans to biters (atk), swimming to fast forms (spd),
+  // time with allies near you to tough ones (hp). The style is a running mix: half this level, half the levels before.
+  function styleLvl() { return run.styleLvl || (run.styleLvl = { bite: 0, swim: 0, ally: 0, t: 0 }); }
+  function formsOf(n) { var lead = D.leadOf(n); return SPECIES.filter(function (sp) { return sp.tier === n && (sp.form || sp === lead); }); }
+  function formWeights(pool, st) {
+    return pool.map(function (sp) {
+      var dot = st.a * (sp.atk || 1) + st.s * (sp.spd || 1) + st.h * (sp.hp || 1);
+      return Math.exp(6 * (dot - (st.a + st.s + st.h)));
+    });
+  }
+  function pickForm(n) {
+    var s = styleLvl(), t = Math.max(1, s.t);
+    // This level, each against a plain baseline: 12 bites a minute, swimming 60% of the time, 1.5 allies near you.
+    var a = s.bite / t * 60 / 12, w = s.swim / t / 0.6, h = s.ally / t / 1.5, sum = a + w + h;
+    var now = sum > 0 ? { a: a / sum, s: w / sum, h: h / sum } : null, prev = run.style;
+    var st = now && prev ? { a: (now.a + prev.a) / 2, s: (now.s + prev.s) / 2, h: (now.h + prev.h) / 2 } : (now || prev || { a: 0, s: 0, h: 0 });
+    run.style = st;
+    run.styleLvl = { bite: 0, swim: 0, ally: 0, t: 0 };
+    var pool = formsOf(n), ws = formWeights(pool, st), total = ws.reduce(function (x, y) { return x + y; }, 0), roll = Math.random() * total, i;
+    for (i = 0; i < pool.length; i++) { roll -= ws[i]; if (roll <= 0) return pool[i]; }
+    return pool[pool.length - 1];
+  }
+
   function enterLevel(n) {
     var r = run;
     // Fish keep their places around you: remember each offset, then place them again on the new, larger sea.
@@ -637,13 +695,15 @@
     cam.y = r.y;
     // The fish already around you stay. New species only appear far away, gradually (see fillPopulations).
     if (r.zoneFrom !== r.info.zone) { r.zoneOld = r.zoneFrom || r.info.zone; r.zoneFrom = r.info.zone; r.bgT = 0; }
-    var lead = D.leadOf(n), evolved = !!r.form && r.form.id !== lead.id;
+    var lead = pickForm(n), evolved = !!r.form && r.form.id !== lead.id;
     r.form = lead;
+    (r.path = r.path || []).push({ n: n, id: lead.id, name: lead.name, build: lead.build || 'all-round' });   // your evolution path
     if (evolved) r.npcs.forEach(function (o) {   // v0.12: your school changes form over a few seconds, not at once
       if (o.pod && !o.dead) o.morph = { from: o.morph ? o.morph.from : o.sp, t: 0, dur: morphTime(lead) };
     });
+    var say = lead.build ? D.BUILDS[lead.build].say : 'all-round';
     showBanner(evolved ? 'Evolved into ' + lead.name + '!' : 'Level ' + n + ': ' + r.info.name,
-      (evolved ? 'Level ' + n + ': ' + r.info.name + '. ' : '') + r.info.zone.name + '. Goal: size ' + r.info.goal, 3200);
+      (evolved ? 'Level ' + n + ': ' + r.info.name + '. ' + lead.name + ': ' + say + '. ' : '') + 'Goal: size ' + Math.round(r.info.goal), 3200);
   }
 
   function spawnNPC(sp, initial) {
@@ -907,6 +967,7 @@
     n.vx += (tdx / dd * s - n.vx) * Math.min(1, dt * 4);
     n.vy += (tdy / dd * s - n.vy) * Math.min(1, dt * 4);
     n.x = wrapX(n.x + n.vx * dt); n.y = clamp(n.y + n.vy * dt, 20, bedY(n.x) - 10);
+    tideNudge(n, dt, 1.2);   // v0.12: the tide scatters your school
     if (Math.abs(n.vx) > 3) n.facing = n.vx > 0 ? 1 : -1;
   }
 
@@ -1124,7 +1185,7 @@
   function updatePlayer(dt) {
     var r = run, dx = 0, dy = 0;
     r.biteT = Math.max(0, (r.biteT || 0) - dt);
-    r.maxHp = playerMaxHp(r.size);
+    r.maxHp = Math.round(playerMaxHp(r.size) * (r.form.hp || 1));   // v0.12: your form's health
     r.hp = Math.min(r.hp, r.maxHp);
     r.quietT = (r.quietT || 0) + dt;
     if (r.quietT > 4 && r.hp < r.maxHp) r.hp = Math.min(r.maxHp, r.hp + 3 * dt);
@@ -1154,11 +1215,13 @@
       if (r.sprintCd <= 0) r.stamina = Math.min(100, r.stamina + 24 * dt);
     }
     r.sprinting = sprint;
-    var sp = speedFor(r.size) * (1 + 0.03 * (r.info.n - 1)) * (sprint ? 2.1 : 1);   // v0.11: +3% a level, like the fish
+    var sp = speedFor(r.size) * (1 + 0.03 * (r.info.n - 1)) * (r.form.spd || 1) * (sprint ? 2.1 : 1);   // +3% a level; v0.12: your form's speed
     var k = Math.min(1, dt * 7);
     r.vx += (dx * sp - r.vx) * k;
     if (!r.air) r.vy += (dy * sp - r.vy) * k;
     r.x = wrapX(r.x + r.vx * dt + currentAt(r.y) * 0.5 * dt);
+    if (!r.air) tideNudge(r, dt, 1);   // v0.12: the tide drags you too
+    if (Math.hypot(r.vx, r.vy) > sp * 0.4) styleLvl().swim += dt;   // v0.12: time spent swimming
     if (r.air) {
       // In the air: gravity, then a splash when you land back on the surface.
       r.vy += GRAV * dt;
@@ -1327,6 +1390,7 @@
     n.y = clamp(n.y + n.vy * dt, 20, bedY(n.x) - 10);
     if (sp.bed) n.y = bedY(n.x) - 12;   // v0.11: crabs walk the seabed
     if (sp.surf) n.y = surfY(n.x) - 26;   // v0.12: boats float on the surface
+    if (!sp.bed && !sp.surf) tideNudge(n, dt, 1);   // v0.12: the tide drags every fish
     if (Math.abs(n.vx) > 3) n.facing = n.vx > 0 ? 1 : -1;
   }
 
@@ -1451,7 +1515,8 @@
     if (r.biteT <= 0 && n.size >= r.size * edibleMin()) {   // v0.12: you do not bite fish under half your size
       r.biteT = BITE_S;
       r.lastBit = n;   // v0.11: the target your allies join when you use Attack
-      n.hp -= atkOf(r.size);
+      n.hp -= Math.max(1, Math.round(atkOf(r.size) * (r.form.atk || 1)));   // v0.12: your form's bite
+      styleLvl().bite++;
       burst(n.x, n.y, '#d9473a', 5);
       schoolDefend(n, null);
       if (n.hp <= 0) eatNPC(n);
@@ -1488,6 +1553,7 @@
       text = 'Time is up in the sea. You reached level ' + r.level + ' (' + r.info.name + ').';
       FishSound.play('lose');
     }
+    if (r.path && r.path.length > 1) text += ' Your path: ' + r.path.map(function (p) { return p.name; }).join(' → ') + '.';   // v0.12
     text += ' Score ' + score + '. Best ' + best + '.';
     showCard(title, text);
   }
@@ -1505,6 +1571,9 @@
 
     updatePods();
     updateBirds(dt);
+    updateTide(dt);   // v0.12
+    styleLvl().t += dt;   // v0.12: time with your school and allies near you (within 400)
+    styleLvl().ally += r.npcs.filter(function (o) { return o.pod && !o.dead && distW(o, r) < 400; }).length * dt;
     if (r.cmd) { r.cmd.t -= dt; if (r.cmd.t <= 0 || r.cmd.target.dead) r.cmd = null; }
     if (r.cmdCd > 0) r.cmdCd = Math.max(0, r.cmdCd - dt);
     r.spawnT = (r.spawnT || 0) - dt;
@@ -1769,6 +1838,7 @@
       ctx.setLineDash([]);
     });
 
+    drawTide();
     list.forEach(function (n) {   // v0.12: a new friend: a teal ring grows out and fades as it joins you
       if (!(n.joinRing > 0)) return;
       var k = 1 - n.joinRing / 0.8;
@@ -1803,6 +1873,29 @@
         ctx.globalAlpha = 1;
       }
     });
+    ctx.restore();
+  }
+
+  // v0.12 tide: white streaks that churn, then stream with the pull, across the view.
+  function drawTide() {
+    if (!run.tide) return;
+    var L = tideLevels(), a = Math.max(L.churn, L.pull);
+    if (a <= 0.01) return;
+    var halfW = CW / 2 / cam.scale, halfH = CH / 2 / cam.scale, T = run.t, dir = run.tide.dir, i;
+    ctx.save();
+    ctx.lineCap = 'round';
+    var white = 'rgba(255,255,255,' + (0.75 * a).toFixed(2) + ')', edge = 'rgba(45,58,74,' + (0.18 * a).toFixed(2) + ')';
+    for (i = 0; i < 70; i++) {
+      var fx = (i * 0.6180339) % 1, fy = (i * 0.4142135) % 1, span = 2 * halfW;
+      var x = cam.x - halfW + ((((fx * span + dir * T * 260 * L.pull / Math.max(0.3, cam.scale)) + Math.sin(T + i) * 40 * L.churn) % span) + span) % span;
+      var y = cam.y - halfH + fy * 2 * halfH + Math.sin(T * 1.7 + i) * 30 * L.churn / cam.scale;
+      var len = (30 + 90 * L.pull) / cam.scale, bend = 14 * L.churn / cam.scale;
+      if (y < surfY(x) + 10) continue;   // streaks are in the water, not the sky
+      // A thin dark edge under each white streak, so it shows on the pale shallow water as well as the deep blue.
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + dir * len * 0.5, y - bend, x + dir * len, y);
+      ctx.strokeStyle = edge; ctx.lineWidth = 5 / cam.scale; ctx.stroke();
+      ctx.strokeStyle = white; ctx.lineWidth = 2.5 / cam.scale; ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -1929,7 +2022,7 @@
       x: 0, y: 0, vx: 0, vy: 0, facing: 1,
       stamina: 100, sprintCd: 0, sprinting: false, inv: 2.5,
       npcs: [], parts: [], spawnT: 0, bannerT: 0, lockedCount: 0, score: 0,
-      difficulty: getDifficulty(), form: D.leadOf(1), npcEaten: 0, hitBy: '', goal: D.levelInfo(1).goal, packSeq: 0,
+      difficulty: getDifficulty(), form: D.leadOf(1), path: [{ n: 1, id: D.leadOf(1).id, name: D.leadOf(1).name, build: 'all-round' }], npcEaten: 0, hitBy: '', goal: D.levelInfo(1).goal, packSeq: 0,
       zoneFrom: null, zoneOld: null, bgT: 1,
       hp: playerMaxHp(D.START_SIZE), maxHp: playerMaxHp(D.START_SIZE), biteT: 0, quietT: 0, podSpawns: 0
     };
@@ -2353,6 +2446,13 @@
     // Test hooks. debugSetSize skips the calm, so a check can set any size; debugGrow goes through the calm rules.
     debugSetSize: function (s) { if (run && mode === 'play') { run.size = s; while (run && mode === 'play' && run.info.n < 20 && run.size >= run.goal) { run.calmT = 0; checkGrowth(); } } },
     debugGrow: function (s) { if (run && mode === 'play') { run.size = s; checkGrowth(); } },
+    debugTide: function () { if (run && mode === 'play') { run.tideNext = run.t; run.calmT = 0; } },
+    // Test hook: each form of level n and its chance for a play style (a = biting, s = swimming, h = allies).
+    debugFormOdds: function (n, a, s, h) {
+      var pool = formsOf(n), ws = formWeights(pool, { a: a, s: s, h: h }), total = ws.reduce(function (x, y) { return x + y; }, 0), out = {};
+      pool.forEach(function (sp, i) { out[sp.id] = { share: +(ws[i] / total).toFixed(3), build: sp.build || 'all-round', atk: sp.atk || 1, spd: sp.spd || 1, hp: sp.hp || 1 }; });
+      return out;
+    },
     loopErrors: function () { return errorLog.slice(); },
     bedAt: function (x) { return run ? bedY(x) : null; },
     surfAt: function (x) { return run ? surfY(x) : null; },
@@ -2372,6 +2472,9 @@
         forests: run && run.flora ? run.flora.filter(function (f) { return f.forest; }).length : null,
         calm: run ? +(run.calmT || 0).toFixed(2) : null, bedNear: run ? Math.round(bedY(run.x)) : null,
         morphing: run ? run.npcs.filter(function (o) { return o.morph && !o.dead; }).length : null,
+        H: run ? run.info.H : null, path: run ? (run.path || []).map(function (p) { return p.id; }) : null,
+        formBuild: run && run.form ? run.form.build || 'all-round' : null, style: run ? run.style || null : null,
+        tide: run && run.tide ? +run.tide.t.toFixed(2) : null,
         allies: run ? run.npcs.filter(function (o) { return o.ally && !o.friend && !o.dead; }).length : 0,
         friends: run ? run.npcs.filter(function (o) { return o.friend && !o.dead; }).length : 0,
         followerMass: run ? +followerMass().toFixed(2) : null, followerLimit: run ? +(ALLY_LIMIT * run.size).toFixed(2) : null,

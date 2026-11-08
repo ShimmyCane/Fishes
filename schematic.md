@@ -35,37 +35,37 @@ A game inside a fish tank that becomes the ocean. You start as a baby fish eatin
 
 ## Tiers, evolution and the food chain
 
-Twenty tiers (one per level), in five depth zones. The play area starts at 3198 × 1999 and widens with each tier as the camera needs (about 47,444 × 29,653 at tier 20). On screen, a fish grows 25% from tier 1 to tier 20, interpolated by tier; the camera zooms out to hold that, and never shows more than 90% of the sea's width.
+Twenty tiers (one per level), in five depth zones. The play area starts at 3198 × 2000. Its width grows with each tier as the camera needs (about 40,264 at tier 20); its height stays 2000 on every tier (v0.12), and the camera zooms out instead. On screen, a fish grows 25% from tier 1 to tier 20, interpolated by tier; the camera zooms out to hold that, and never shows more than 90% of the sea's width. A big fish is drawn shorter than before (its length grows with the square root of its size past 20), so the largest fish fits the fixed height.
 
-- **Evolution:** each tier has a lead species. On reaching a tier you take its form (banner: "Evolved into …"). Tier 1 is a guppy; tier 20 is a basking shark.
+- **Evolution (v0.12):** each tier has its first species plus five forms with a build (biter, swift, tough, striker, guard, cruiser) that sets bite, speed and health. On reaching a tier you become one of them, picked at random and weighted by how you played: biting leans to bite builds, swimming to fast ones, time with allies near you to tough ones. The style is a running mix (half this level, half before). Your path is shown at the end of a run. Tier 1 starts as a guppy. The table below is generated from `js/species.js`.
 - **3–8 species per tier** (88 in total, food included), each with a temper:
   - **docile** never attacks and never locks on. It flees bigger fish. (Guppy, herring, angelfish, sunfish.)
   - **wary** hunts smaller fish, ignores you when you are smaller, and flees when you are bigger. It does not lock on. (Dottyback, cleaner wrasse, sailfish, goblin shark.)
   - **aggressive** hunts smaller fish and locks on to you when you are smaller. (Bonito, barracuda, bluefin tuna, reef shark, great white, blue marlin.)
 - **Any fish can fight any fish (v0.10).** Two fish that touch fight, whatever their size. Each bites on its own timer for its attack value, and the one whose health runs out first is removed. Food and harmless fish never bite. Fish of the same species do not fight each other. The player still eats plankton, chum and smaller fish by the 1.15× rule; the lock-on and the hunters' chase still use size.
 
-| Tier | Zone | Size to leave | Species (temper) |
-|---|---|---|---|
-| 1 Sunny Cove | Sunny Shallows | 2 | Guppy (docile) · Neon tetra (docile) · Zebrafish (docile) · Plankton (food) |
-| 2 Sea-grass Flats | Sunny Shallows | 3 | Clownfish (docile) · Goby (docile) · Blenny (docile) · Dottyback (wary) · Krill (food) |
-| 3 Rock Pool Edge | Sunny Shallows | 4 | Cleaner wrasse (wary) · Herring (docile) · Sardine (docile) · Hawkfish (wary) |
-| 4 Sandy Shelf | Sunny Shallows | 5 | Anchovy (docile) · Pufferfish (docile) · Butterflyfish (docile) · Sergeant major (docile) · Cardinalfish (docile) |
-| 5 Coral Gardens | Coral Reef | 7 | Parrotfish (docile) · Blue damselfish (wary) · Moray eel (aggressive) · Scorpionfish (wary) · Sea chub (docile) |
-| 6 Anemone Bay | Coral Reef | 9 | Angelfish (docile) · Blue tang (docile) · Lionfish (wary) · Trumpetfish (wary) · Porcupinefish (docile) |
-| 7 Reef Wall | Coral Reef | 11 | Mackerel (wary) · Triggerfish (docile) · Bonito (aggressive) · Sweetlips (docile) · Snook (wary) |
-| 8 Parrot Lagoon | Coral Reef | 14 | Grey mullet (docile) · Rockfish (docile) · Red snapper (wary) · Bluefish (aggressive) · Grouper (wary) |
-| 9 Open Blue | Open Blue | 17 | Jack (wary) · Pompano (docile) · Amberjack (wary) · Trevally (wary) · Barracuda (aggressive) |
-| 10 Tuna Run | Open Blue | 21 | Mahi-mahi (wary) · Bonefish (docile) · Yellowfin tuna (wary) · Bluefin tuna (aggressive) |
-| 11 Shark Lane | Open Blue | 25 | Rainbow runner (docile) · Cobia (docile) · Dogtooth tuna (wary) · Sailfish (wary) · Reef shark (aggressive) |
-| 12 Wide Water | Open Blue | 30 | Sea bream (docile) · Permit (docile) · Wahoo (aggressive) · Striped marlin (wary) |
-| 13 Twilight Shoal | Twilight | 36 | Lanternfish (docile) · Hatchetfish (wary) · Lookdown (docile) · Opah (docile) · Snake mackerel (wary) |
-| 14 Lantern Drift | Twilight | 43 | Escolar (wary) · Ocean sunfish (docile, harmless) · Anglerfish (aggressive) · Lancetfish (wary) |
-| 15 Angler Shelf | Twilight | 50 | Pomfret (docile) · Sablefish (docile) · Thresher shark (wary) · Swordfish (aggressive) |
-| 16 Slope Edge | Twilight | 58 | Oilfish (docile) · Cusk eel (docile) · Hammerhead (wary) · Gulper eel (aggressive) |
-| 17 Deep Trench | Deep Trench | 67 | Viperfish (wary) · Tripodfish (docile) · Coelacanth (docile, harmless) · Oarfish (docile, harmless) · Frilled shark (wary) |
-| 18 Oar Valley | Deep Trench | 77 | Goblin shark (wary) · Megamouth shark (docile, harmless) · Sixgill shark (wary) · Great white (aggressive) |
-| 19 Abyss Mouth | Deep Trench | 88 | Greenland shark (wary) · Blue marlin (aggressive) · Sand tiger shark (docile) |
-| 20 Whale Ocean | Deep Trench | 100 | Basking shark (docile, harmless) · Whale shark (docile, harmless) · Giant sunfish (docile, harmless) |
+| Tier | Zone | Size to leave | Species (temper) | Forms you can evolve into (build) |
+|---|---|---|---|---|
+| 1 Sunny Cove | Sunny Shallows | 12 | Guppy (docile) · Neon tetra (docile) · Zebrafish (docile) · Plankton (food) · Green sea turtle (harmless) · Rock crab (harmless) | Betta (biter) · Pearl danio (swift) · Platy (tough) · Swordtail (striker) · Black molly (cruiser) |
+| 2 Sea-grass Flats | Sunny Shallows | 21 | Clownfish (docile) · Goby (docile) · Blenny (docile) · Dottyback (wary) · Krill (food) | Pinfish (biter) · Silverside (swift) · Mudskipper (tough) · Sand smelt (striker) · Killifish (cruiser) |
+| 3 Rock Pool Edge | Sunny Shallows | 30 | Cleaner wrasse (wary) · Herring (docile) · Sardine (docile) · Hawkfish (wary) · Moon jellyfish (harmless) | Sculpin (biter) · Rock gunnel (swift) · Rock goby (tough) · Corkwing wrasse (guard) · Shanny (cruiser) |
+| 4 Sandy Shelf | Sunny Shallows | 39 | Anchovy (docile) · Pufferfish (docile) · Butterflyfish (docile) · Sergeant major (docile) · Cardinalfish (docile) | Lesser weever (biter) · Dragonet (swift) · Flounder (tough) · Red mullet (striker) · Sand perch (guard) |
+| 5 Coral Gardens | Coral Reef | 57 | Parrotfish (docile) · Blue damselfish (wary) · Moray eel (aggressive) · Scorpionfish (wary) · Sea chub (docile) | Hogfish (biter) · Yellow goatfish (swift) · Squirrelfish (tough) · Soldierfish (guard) · Bannerfish (cruiser) |
+| 6 Anemone Bay | Coral Reef | 62 | Angelfish (docile) · Blue tang (docile) · Lionfish (wary) · Trumpetfish (wary) · Porcupinefish (docile) | Surgeonfish (biter) · Moorish idol (swift) · Batfish (tough) · Filefish (striker) · Rabbitfish (cruiser) |
+| 7 Reef Wall | Coral Reef | 67 | Mackerel (wary) · Triggerfish (docile) · Bonito (aggressive) · Sweetlips (docile) · Snook (wary) | Coral trout (biter) · Yellowtail snapper (swift) · Spangled emperor (tough) · Bluefin trevally (striker) · Black grouper (guard) |
+| 8 Parrot Lagoon | Coral Reef | 75 | Grey mullet (docile) · Rockfish (docile) · Red snapper (wary) · Bluefish (aggressive) · Grouper (wary) | Queen triggerfish (biter) · Ladyfish (swift) · Napoleon wrasse (tough) · Spanish mackerel (striker) · Tarpon (cruiser) |
+| 9 Open Blue | Open Blue | 83 | Jack (wary) · Pompano (docile) · Amberjack (wary) · Trevally (wary) · Barracuda (aggressive) | Yellowtail amberjack (biter) · Skipjack tuna (swift) · Cubera snapper (tough) · Atlantic bonito (striker) · Little tunny (cruiser) |
+| 10 Tuna Run | Open Blue | 94 | Mahi-mahi (wary) · Bonefish (docile) · Yellowfin tuna (wary) · Bluefin tuna (aggressive) | King mackerel (biter) · Albacore (swift) · Giant grouper (tough) · Narrow-barred mackerel (striker) · Longtail tuna (cruiser) |
+| 11 Shark Lane | Open Blue | 104 | Rainbow runner (docile) · Cobia (docile) · Dogtooth tuna (wary) · Sailfish (wary) · Reef shark (aggressive) | Blacktip reef shark (biter) · Spinner shark (swift) · Nurse shark (tough) · Lemon shark (guard) · Bonnethead (cruiser) |
+| 12 Wide Water | Open Blue | 117 | Sea bream (docile) · Permit (docile) · Wahoo (aggressive) · Striped marlin (wary) | Atlantic wolffish (biter) · Shortbill spearfish (swift) · Wreckfish (tough) · Blue shark (striker) · Giant trevally (guard) |
+| 13 Twilight Shoal | Twilight | 133 | Lanternfish (docile) · Hatchetfish (wary) · Lookdown (docile) · Opah (docile) · Snake mackerel (wary) | Black dragonfish (biter) · Pearlside (swift) · Barreleye (tough) · Snipe eel (striker) · Bristlemouth (cruiser) |
+| 14 Lantern Drift | Twilight | 151 | Escolar (wary) · Ocean sunfish (harmless) · Anglerfish (aggressive) · Lancetfish (wary) | Daggertooth (biter) · Telescopefish (swift) · Black swallower (tough) · Fangtooth (guard) · Pelican eel (cruiser) |
+| 15 Angler Shelf | Twilight | 169 | Pomfret (docile) · Sablefish (docile) · Thresher shark (wary) · Swordfish (aggressive) | Stargazer (biter) · Ghost shark (swift) · Monkfish (tough) · Sea toad (guard) · Coffinfish (cruiser) |
+| 16 Slope Edge | Twilight | 190 | Oilfish (docile) · Cusk eel (docile) · Hammerhead (wary) · Gulper eel (aggressive) | Lingcod (biter) · Grenadier (swift) · Orange roughy (tough) · Pacific halibut (guard) · Hagfish (cruiser) |
+| 17 Deep Trench | Deep Trench | 214 | Viperfish (wary) · Tripodfish (docile) · Coelacanth (harmless) · Oarfish (harmless) · Frilled shark (wary) | Black seadevil (biter) · Rattail (swift) · Snailfish (tough) · Deep-sea cod (guard) · Smooth dreamer (cruiser) |
+| 18 Oar Valley | Deep Trench | 240 | Goblin shark (wary) · Megamouth shark (harmless) · Sixgill shark (wary) · Great white (aggressive) | Broadnose sevengill (biter) · Ribbonfish (swift) · Pacific sleeper shark (tough) · Atlantic bluefin (striker) · Giant sea bass (guard) |
+| 19 Abyss Mouth | Deep Trench | 268 | Greenland shark (wary) · Blue marlin (aggressive) · Sand tiger shark (docile) | Tiger shark (biter) · Shortfin mako (swift) · Giant manta ray (tough) · Oceanic whitetip (striker) · Bull shark (guard) |
+| 20 Whale Ocean | Deep Trench | 300 | Basking shark (harmless) · Whale shark (harmless) · Giant sunfish (harmless) | Great hammerhead (biter) · Black marlin (swift) · Beluga sturgeon (tough) · Longfin mako (striker) · Goliath grouper (guard) |
 
 Each species' real-fish note is in `js/species.js`.
 

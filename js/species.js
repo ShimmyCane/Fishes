@@ -284,6 +284,136 @@
       real: "Lion's mane jellyfish: a big floating bell with long tentacles. It stings on contact and cannot be eaten." }
   ];
 
+  // v0.12 forms: five more species on every level, each one you can evolve into. Each has a build that sets its
+  // bite (atk), speed (spd) and health (hp) against an all-round fish (1). When you level up, the game picks your
+  // next form at random, weighted towards the builds that suit how you have played (see pickForm in game.js).
+  var BUILDS = {
+    biter:   { atk: 1.4,  spd: 0.95, hp: 0.9,  size: 1.05, temper: 'wary',   say: 'hard bites' },
+    swift:   { atk: 0.9,  spd: 1.3,  hp: 0.9,  size: 0.9,  temper: 'docile', say: 'fast' },
+    tough:   { atk: 1.0,  spd: 0.85, hp: 1.45, size: 1.15, temper: 'docile', say: 'lots of health' },
+    striker: { atk: 1.25, spd: 1.15, hp: 0.8,  size: 1.0,  temper: 'wary',   say: 'hard bites and fast' },
+    guard:   { atk: 1.2,  spd: 0.85, hp: 1.25, size: 1.1,  temper: 'wary',   say: 'hard bites and tough' },
+    cruiser: { atk: 0.85, spd: 1.15, hp: 1.25, size: 1.0,  temper: 'docile', say: 'fast and tough' }
+  };
+  // A size for each tier's forms, smoother than the first species of the tier (some deep-sea ones are tiny).
+  var TIER_SIZE = [0.9, 1.6, 2.2, 2.8, 3.6, 4.5, 6, 9, 13, 15, 18, 22, 26, 30, 36, 48, 55, 70, 80, 90];
+  var SHAPE_HR = { round: 0.55, slim: 0.3, torpedo: 0.3, lure: 0.6, puff: 0.8, oar: 0.25, whale: 0.35 };
+  // [id, name, shape, body colour, fin colour, build, real fact], five per tier.
+  var FORMS = [
+    [['betta', 'Betta', 'round', '#c0392b', '#8e44ad', 'biter', 'Betta: a fighting fish that flares its fins.'],
+     ['danio', 'Pearl danio', 'slim', '#d8e2f0', '#ffb3c1', 'swift', 'Pearl danio: a quick, shimmering little shoaler.'],
+     ['platy', 'Platy', 'round', '#ff8a3d', '#ffc36b', 'tough', 'Platy: a small, sturdy live-bearer.'],
+     ['swordtail', 'Swordtail', 'slim', '#ff6b4a', '#ffd166', 'striker', 'Swordtail: the male tail ends in a long sword.'],
+     ['molly', 'Black molly', 'round', '#3a3f4a', '#6b7280', 'cruiser', 'Black molly: hardy and calm, it copes with most water.']],
+    [['pinfish', 'Pinfish', 'round', '#c9d1b0', '#f2e27a', 'biter', 'Pinfish: sharp spines and a nip for anything.'],
+     ['silverside', 'Silverside', 'slim', '#dfe9f2', '#a9c3dc', 'swift', 'Silverside: a slim, fast fish of the shallows.'],
+     ['mudskipper', 'Mudskipper', 'round', '#8a7a5a', '#5f9ad0', 'tough', 'Mudskipper: so tough it walks on the mud.'],
+     ['sandsmelt', 'Sand smelt', 'slim', '#cfe3e8', '#8fb5c4', 'striker', 'Sand smelt: darts in shoals over the sand.'],
+     ['killifish', 'Killifish', 'round', '#6fb0a0', '#f2a65a', 'cruiser', 'Killifish: small, hardy and colourful.']],
+    [['sculpin', 'Sculpin', 'round', '#8a6b4a', '#c49a6c', 'biter', 'Sculpin: a big mouth that swallows what it can.'],
+     ['gunnel', 'Rock gunnel', 'eel', '#b0845a', '#7a5a3a', 'swift', 'Rock gunnel: a slippery fish that wriggles between rocks.'],
+     ['rockgoby', 'Rock goby', 'round', '#6b5a48', '#a89070', 'tough', 'Rock goby: clings to rocks through the waves.'],
+     ['corkwing', 'Corkwing wrasse', 'round', '#5f9a6b', '#d9b36b', 'guard', 'Corkwing wrasse: builds a nest and guards it.'],
+     ['shanny', 'Shanny', 'round', '#7a8a5a', '#b5c27a', 'cruiser', 'Shanny: survives hours out of water at low tide.']],
+    [['weever', 'Lesser weever', 'slim', '#d8c49a', '#2d2d2d', 'biter', 'Lesser weever: hides in the sand with venomous spines.'],
+     ['dragonet', 'Dragonet', 'slim', '#e0a03a', '#3fa9e0', 'swift', 'Dragonet: a bright fish that flits over the sand.'],
+     ['flounder', 'Flounder', 'round', '#a08868', '#7a6a50', 'tough', 'Flounder: a flatfish that lies hidden on the bottom.'],
+     ['redmullet', 'Red mullet', 'slim', '#f08a6b', '#ffd0a8', 'striker', 'Red mullet: feels for food with its barbels.'],
+     ['sandperch', 'Sand perch', 'round', '#c9a87a', '#8a6b4a', 'guard', 'Sand perch: holds its patch of sand.']],
+    [['hogfish', 'Hogfish', 'round', '#f0b8a0', '#d9573f', 'biter', 'Hogfish: roots in the sand with a long snout.'],
+     ['goatfish', 'Yellow goatfish', 'slim', '#f2e6c9', '#ffd23a', 'swift', 'Yellow goatfish: schools over the reef by day.'],
+     ['squirrelfish', 'Squirrelfish', 'round', '#e8553e', '#ffd0c0', 'tough', 'Squirrelfish: big eyes and spiny armour.'],
+     ['soldierfish', 'Soldierfish', 'round', '#d94a3a', '#f2a090', 'guard', 'Soldierfish: holds its cave against others.'],
+     ['bannerfish', 'Bannerfish', 'round', '#f4f1ea', '#2d2d2d', 'cruiser', 'Bannerfish: a long white banner on its back.']],
+    [['surgeonfish', 'Surgeonfish', 'round', '#5f86b8', '#ffd34d', 'biter', 'Surgeonfish: a scalpel-sharp spine by its tail.'],
+     ['moorishidol', 'Moorish idol', 'round', '#ffe36b', '#2a2a2a', 'swift', 'Moorish idol: a striped reef fish with a long fin.'],
+     ['batfish', 'Batfish', 'round', '#c9b48a', '#8a7a5a', 'tough', 'Batfish: tall and round, it drifts in shoals.'],
+     ['filefish', 'Filefish', 'slim', '#b8c96b', '#7a8a3a', 'striker', 'Filefish: rough skin and a spine that locks up.'],
+     ['rabbitfish', 'Rabbitfish', 'round', '#e8d06b', '#c4a840', 'cruiser', 'Rabbitfish: grazes weed and carries venomous spines.']],
+    [['coraltrout', 'Coral trout', 'torpedo', '#e05a4a', '#2d6fd0', 'biter', 'Coral trout: a red grouper that ambushes on the reef.'],
+     ['yellowtail', 'Yellowtail snapper', 'slim', '#c9d6e0', '#ffd23a', 'swift', 'Yellowtail snapper: quick, with a yellow streak.'],
+     ['emperor', 'Spangled emperor', 'round', '#c9b8a0', '#5fa9e0', 'tough', 'Spangled emperor: blue spots and a strong build.'],
+     ['bluefintrevally', 'Bluefin trevally', 'torpedo', '#8aa9c9', '#3fa9e0', 'striker', 'Bluefin trevally: hunts in fast packs.'],
+     ['blackgrouper', 'Black grouper', 'round', '#5a5a50', '#3a3a33', 'guard', 'Black grouper: a heavy fish that guards its cave.']],
+    [['queentrigger', 'Queen triggerfish', 'round', '#5fa9c9', '#e0c04a', 'biter', 'Queen triggerfish: strong teeth crack sea urchins.'],
+     ['ladyfish', 'Ladyfish', 'slim', '#e0e8f0', '#a9c3dc', 'swift', 'Ladyfish: leaps and runs when hooked.'],
+     ['napoleon', 'Napoleon wrasse', 'round', '#3f9a8a', '#7fd6b0', 'tough', 'Napoleon wrasse: a huge wrasse with a bump on its head.'],
+     ['spanishmack', 'Spanish mackerel', 'torpedo', '#c4d6e8', '#e8c04a', 'striker', 'Spanish mackerel: fast and toothy.'],
+     ['tarpon', 'Tarpon', 'torpedo', '#d8e2ea', '#8aa0b8', 'cruiser', 'Tarpon: big silver scales, it can gulp air.']],
+    [['yellowtailaj', 'Yellowtail amberjack', 'torpedo', '#c9d6c0', '#ffd23a', 'biter', 'Yellowtail amberjack: a powerful hunter of bait fish.'],
+     ['skipjack', 'Skipjack tuna', 'torpedo', '#5f7fa8', '#c4d6e8', 'swift', 'Skipjack tuna: a small, very fast tuna.'],
+     ['cubera', 'Cubera snapper', 'round', '#b05a4a', '#8a4a3a', 'tough', 'Cubera snapper: the largest snapper, with big canines.'],
+     ['atlbonito', 'Atlantic bonito', 'torpedo', '#4f7fa8', '#9fb8d8', 'striker', 'Atlantic bonito: striped and quick to strike.'],
+     ['littletunny', 'Little tunny', 'torpedo', '#4a6a90', '#b0c4dc', 'cruiser', 'Little tunny: a small tuna that travels far.']],
+    [['kingmack', 'King mackerel', 'torpedo', '#8aa0b8', '#5f7a96', 'biter', 'King mackerel: razor teeth and a fast strike.'],
+     ['albacore', 'Albacore', 'torpedo', '#3f5f88', '#c9d6e8', 'swift', 'Albacore: a long-finned tuna that crosses oceans.'],
+     ['giantgrouper', 'Giant grouper', 'round', '#6b6b58', '#4a4a3a', 'tough', 'Giant grouper: one of the largest reef fish.'],
+     ['narrowmack', 'Narrow-barred mackerel', 'torpedo', '#9fb0c4', '#e0c04a', 'striker', 'Narrow-barred mackerel: a long, fast mackerel.'],
+     ['longtail', 'Longtail tuna', 'torpedo', '#4a6a90', '#e8d06b', 'cruiser', 'Longtail tuna: a coastal tuna built for long swims.']],
+    [['blacktip', 'Blacktip reef shark', 'torpedo', '#b0b8c0', '#2a2d33', 'biter', 'Blacktip reef shark: black tips on every fin.'],
+     ['spinner', 'Spinner shark', 'torpedo', '#a8b4c0', '#7a8a9a', 'swift', 'Spinner shark: spins out of the water as it hunts.'],
+     ['nurse', 'Nurse shark', 'torpedo', '#b89a6b', '#8a7050', 'tough', 'Nurse shark: rests on the bottom by day.'],
+     ['lemon', 'Lemon shark', 'torpedo', '#d8c48a', '#b0a060', 'guard', 'Lemon shark: yellowish, it keeps to its home range.'],
+     ['bonnethead', 'Bonnethead', 'torpedo', '#9aa8b4', '#6b7a88', 'cruiser', 'Bonnethead: a small hammerhead with a round head.']],
+    [['wolffish', 'Atlantic wolffish', 'round', '#8a9098', '#5a6068', 'biter', 'Atlantic wolffish: huge teeth crush crabs and shells.'],
+     ['spearfish', 'Shortbill spearfish', 'torpedo', '#3f5f88', '#9fb8d8', 'swift', 'Shortbill spearfish: a small billfish built for speed.'],
+     ['wreckfish', 'Wreckfish', 'round', '#7a6a5a', '#5a4a3a', 'tough', 'Wreckfish: a big, slow fish that lives around wrecks.'],
+     ['blueshark', 'Blue shark', 'torpedo', '#3f6fb8', '#9fc0e8', 'striker', 'Blue shark: long-finned and quick, it roams the open sea.'],
+     ['gianttrevally', 'Giant trevally', 'torpedo', '#8a9aa8', '#3a4a5a', 'guard', 'Giant trevally: a heavy hunter that even catches birds.']],
+    [['dragonfish', 'Black dragonfish', 'eel', '#2a2a3a', '#5fd0c0', 'biter', 'Black dragonfish: glowing lures and needle teeth.'],
+     ['pearlside', 'Pearlside', 'slim', '#b8c4d8', '#5f7fa8', 'swift', 'Pearlside: a tiny silver fish that rises at night.'],
+     ['barreleye', 'Barreleye', 'round', '#9aa0a8', '#5fd0c0', 'tough', 'Barreleye: a see-through head with tube eyes.'],
+     ['snipeeel', 'Snipe eel', 'eel', '#8a7a6a', '#5a4a3a', 'striker', 'Snipe eel: a long eel with bird-like jaws.'],
+     ['bristlemouth', 'Bristlemouth', 'slim', '#4a4a5a', '#8a8aa0', 'cruiser', 'Bristlemouth: perhaps the most common fish on Earth.']],
+    [['daggertooth', 'Daggertooth', 'torpedo', '#6b6b78', '#9a9aa8', 'biter', 'Daggertooth: long fangs for the dark.'],
+     ['telescope', 'Telescopefish', 'slim', '#8a8aa0', '#c4c4d8', 'swift', 'Telescopefish: tube eyes that look straight ahead.'],
+     ['swallower', 'Black swallower', 'round', '#2a2a30', '#4a4a55', 'tough', 'Black swallower: its stomach stretches round fish bigger than itself.'],
+     ['fangtooth', 'Fangtooth', 'round', '#3a2a2a', '#6b4a4a', 'guard', 'Fangtooth: the biggest teeth for its size of any fish.'],
+     ['pelicaneel', 'Pelican eel', 'eel', '#2a2a3a', '#5a5a6b', 'cruiser', 'Pelican eel: a huge mouth on a whip-thin body.']],
+    [['stargazer', 'Stargazer', 'round', '#a89a7a', '#6b5f4a', 'biter', 'Stargazer: buried in sand, eyes on top, it strikes upward.'],
+     ['ghostshark', 'Ghost shark', 'torpedo', '#c4c4cc', '#8a8a98', 'swift', 'Ghost shark: a pale cousin of sharks that glides along.'],
+     ['monkfish', 'Monkfish', 'lure', '#8a7a5a', '#5a4a3a', 'tough', 'Monkfish: a flat angler with a mouth like a trap.'],
+     ['seatoad', 'Sea toad', 'lure', '#c47a5a', '#8a4a3a', 'guard', 'Sea toad: walks on its fins and fishes with a lure.'],
+     ['coffinfish', 'Coffinfish', 'puff', '#e0a090', '#b06a5a', 'cruiser', 'Coffinfish: puffs up with water to look bigger.']],
+    [['lingcod', 'Lingcod', 'torpedo', '#8a8a6b', '#5a5a40', 'biter', 'Lingcod: a big-mouthed hunter of the rocky slope.'],
+     ['grenadier', 'Grenadier', 'slim', '#9aa0a8', '#6b7078', 'swift', 'Grenadier: a big head and a long rat-like tail.'],
+     ['roughy', 'Orange roughy', 'round', '#e8703a', '#c4502a', 'tough', 'Orange roughy: can live for more than 150 years.'],
+     ['halibut', 'Pacific halibut', 'round', '#7a6a58', '#5a4a3a', 'guard', 'Pacific halibut: a giant flatfish of the cold slope.'],
+     ['hagfish', 'Hagfish', 'eel', '#c49a9a', '#9a7070', 'cruiser', 'Hagfish: slips away in a cloud of slime.']],
+    [['seadevil', 'Black seadevil', 'lure', '#2a2a30', '#5fd0c0', 'biter', 'Black seadevil: an angler with a glowing lure.'],
+     ['rattail', 'Rattail', 'slim', '#9a9aa8', '#6b6b78', 'swift', 'Rattail: cruises the trench floor with a whip tail.'],
+     ['snailfish', 'Snailfish', 'round', '#f0d8d0', '#c4a8a0', 'tough', 'Snailfish: lives deeper than any other fish.'],
+     ['deepcod', 'Deep-sea cod', 'round', '#8a8a90', '#5a5a60', 'guard', 'Deep-sea cod: a slow, strong bottom fish.'],
+     ['dreamer', 'Smooth dreamer', 'puff', '#3a2a40', '#6b5a78', 'cruiser', 'Smooth dreamer: a round angler of the deep.']],
+    [['sevengill', 'Broadnose sevengill', 'torpedo', '#8a8a80', '#5a5a50', 'biter', 'Broadnose sevengill: seven gill slits and a big bite.'],
+     ['ribbonfish', 'Ribbonfish', 'oar', '#e0e8f0', '#ff8a8a', 'swift', 'Ribbonfish: a long silver ribbon with a red fin.'],
+     ['sleeper', 'Pacific sleeper shark', 'torpedo', '#5a5a60', '#3a3a40', 'tough', 'Pacific sleeper shark: slow, huge and very hard to stop.'],
+     ['atlbluefin', 'Atlantic bluefin', 'torpedo', '#2d4f8a', '#c4d6e8', 'striker', 'Atlantic bluefin: a warm-blooded giant tuna.'],
+     ['giantseabass', 'Giant sea bass', 'round', '#3a3a40', '#5a5a60', 'guard', 'Giant sea bass: a gentle giant that guards its rocks.']],
+    [['tiger', 'Tiger shark', 'torpedo', '#9a9a88', '#5a5a48', 'biter', 'Tiger shark: stripes, and a bite for almost anything.'],
+     ['mako', 'Shortfin mako', 'torpedo', '#3f5fa8', '#c4d0e8', 'swift', 'Shortfin mako: the fastest shark in the sea.'],
+     ['manta', 'Giant manta ray', 'whale', '#2a2d3a', '#f0f0f0', 'tough', 'Giant manta ray: a huge, gentle ray that filters plankton.'],
+     ['whitetip', 'Oceanic whitetip', 'torpedo', '#8a8a90', '#f4f4f4', 'striker', 'Oceanic whitetip: bold, with white-tipped fins.'],
+     ['bull', 'Bull shark', 'torpedo', '#8a8a88', '#5a5a58', 'guard', 'Bull shark: stocky and strong, it even swims up rivers.']],
+    [['greathammer', 'Great hammerhead', 'torpedo', '#9aa0a8', '#6b7078', 'biter', 'Great hammerhead: the largest hammerhead, a fierce hunter.'],
+     ['blackmarlin', 'Black marlin', 'torpedo', '#2a3a5a', '#5f7fa8', 'swift', 'Black marlin: one of the fastest fish alive.'],
+     ['sturgeon', 'Beluga sturgeon', 'torpedo', '#9a9a8a', '#6b6b5a', 'tough', 'Beluga sturgeon: armoured plates and a vast size.'],
+     ['longfinmako', 'Longfin mako', 'torpedo', '#2d4f8a', '#c4d6e8', 'striker', 'Longfin mako: a rare, long-finned ocean hunter.'],
+     ['goliath', 'Goliath grouper', 'round', '#6b6040', '#4a4430', 'guard', 'Goliath grouper: a huge grouper that booms to scare others.']]
+  ];
+  FORMS.forEach(function (tier, i) {
+    tier.forEach(function (f) {
+      var b = BUILDS[f[5]], sp = {
+        id: f[0], name: f[1], tier: i + 1, kind: 'prey', temper: b.temper, shape: f[2], col: f[3], fin: f[4],
+        size: +(TIER_SIZE[i] * b.size).toFixed(2), speed: Math.round(90 * b.spd + 2 * (i + 1)),
+        atk: b.atk, spd: b.spd, hp: b.hp, build: f[5], form: true, real: f[6]
+      };
+      if (SHAPE_HR[f[2]]) sp.hr = SHAPE_HR[f[2]];
+      SPECIES.push(sp);
+    });
+  });
+
+
   // Depth zones: the sea gets deeper, bigger and darker tier by tier.
   var ZONES = [
     { name: 'Sunny Shallows', top: '#dff8f1', bottom: '#b8ead8', sand: '#f7e6bf', rays: true },
@@ -333,12 +463,16 @@
   function zoneIndex(n) { return n <= 4 ? 0 : n <= 8 ? 1 : n <= 12 ? 2 : n <= 16 ? 3 : 4; }
 
   var SEA_GROWTH = 1.16;   // the sea grows 16% a level (v0.11)
+  // v0.12: the sea's height is fixed (the level-1 height). The camera zooms out instead, so by level 20 you see
+  // most of the depth. For a big fish to fit, its drawn length grows with the square root of its size past 20.
+  var SEA_H = 2000;
+  function fishLen(size) { return size <= 20 ? 22 + size * 5 : 122 * Math.sqrt(size / 20); }
   // v0.11: the sea is never too narrow for the camera. The camera widens the view with the largest fish of a level
   // (see updateCamera in game.js), so a level's sea is at least the width that holds the 25%-interpolated view on a
   // landscape phone at 90% of the sea and a 3x zoom (39 x the fish length at the goal, divided by 1 + 0.25 x the level fraction).
   function seaWidth(n) {
     var goal = GOALS[n - 1], t = (n - 1) / 19;
-    return Math.max(2400 * Math.pow(SEA_GROWTH, n - 1), 39 * (22 + 5 * goal) / (1 + 0.25 * t));
+    return Math.max(2400 * Math.pow(SEA_GROWTH, n - 1), 39 * fishLen(goal) / (1 + 0.25 * t));
   }
 
   function levelInfo(n) {
@@ -350,7 +484,7 @@
       // v0.11: the sea starts twice the v0.10 size and grows 16% a level, so the camera can show a fish
       // 25% bigger by level 20 without the view passing 80% of the sea (see updateCamera in game.js).
       W: Math.round(seaWidth(n)),
-      H: Math.round(seaWidth(n) * 0.625),
+      H: SEA_H,   // v0.12: the sea is the same height on every level; only its width grows
       goal: GOALS[n - 1],
       enterSize: n === 1 ? START_SIZE : GOALS[n - 2],
       meal: SPAN_BASE[n - 1]   // the growth a meal gives this level (v0.11), unchanged by the XP needed
@@ -384,6 +518,9 @@
     LEVEL_NAMES: LEVEL_NAMES,
     DIFFICULTY: DIFFICULTY,
     levelInfo: levelInfo,
+    fishLen: fishLen,
+    SEA_H: SEA_H,
+    BUILDS: BUILDS,
     leadOf: leadOf,
     CONFIG: CONFIG
   };
