@@ -219,9 +219,12 @@ body[data-mode="over"] .attack { display: none; }
 body[data-mode="title"] .ally,
 body[data-mode="over"] .ally { display: none; }
 
+/* Tablets (v0.12): compact. The buttons were about a third of an iPad's width, which took up the sea you play in.
+   Ally, Attack and Sprint are 9 x 3 em, with a smaller action font, so most of the screen is sea. */
 @media (min-width: 700px) and (min-height: 600px) {
-  .ally, .attack, .sprint { width: 18em; }
-  .gear { width: 4em; height: 4em; font-size: 2.6em; }
+  .actions { font-size: clamp(11px, 1.9vmin, 15px); }
+  .ally, .attack, .sprint { width: 9em; height: 3em; }
+  .gear { width: 2.6em; height: 2.6em; font-size: 1.5em; }
 }
 
 .gear {
