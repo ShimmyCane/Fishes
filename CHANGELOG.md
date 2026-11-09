@@ -3,6 +3,9 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.12 — unreleased
+- Smoother play. The game sorts the fish into a grid each frame, so each fish checks only the fish near it, not the whole sea. Fish off screen are not drawn. On a retina iPad the drawing buffer is capped at about 2.2 million pixels, so the sea is drawn at a steady rate.
+- The text size of the page no longer changes the size of the play area. The HUD and buttons are sized in pixels and screen units.
+- From family notes: levels 8 to 10 gave less EXP per fish (a twelfth of the span, not a ninth), so the levels there take more fish.
 - Fixed: on tablets the Sprint button was about twice as large as Ally and Attack. All three are now the same size. (Ally and Attack were overriding the tablet size.)
 - The mini map is at the top right, a quarter of the screen wide, with the hearts and timer card under it. On short landscape phones it stays top left, with the card top right.
 - The trash toy is three times as large by default.

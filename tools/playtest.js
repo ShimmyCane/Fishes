@@ -254,6 +254,22 @@ async function schoolCap(browser, url) {
   await p.close();
 }
 
+// v0.12 performance (2026-11-09: "the game should move smoothly"): the grid search must match a brute-force search, and
+// the canvas buffer must stay within its pixel budget on a big screen.
+async function smoothness(browser, url) {
+  const ctx = await startRun(browser, url, 70, 1024, 768);
+  const p = ctx.page;
+  await p.waitForTimeout(3000);
+  const g = await p.evaluate(function () { return window.FishGame.debugGridCheck(); });
+  check('the grid finds the same nearest fish as a full search', g && g.checked >= 20 && g.mismatches === 0,
+    'checked ' + (g && g.checked) + ' fish among ' + (g && g.fish) + ', mismatches ' + (g && g.mismatches));
+  const buf = await p.evaluate(function () { const c = document.getElementById('view'); return c ? c.width * c.height : 0; });
+  check('the canvas buffer stays within about 2.2 million pixels (1024 x 768 screen)', buf > 0 && buf <= 2200000 * 1.02,
+    'buffer ' + buf + ' pixels');
+  check('no page errors (smoothness)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
 // Can you grow? (2026-11-08: "I can't find anything to eat at levels 1-2.") A bot holds the pointer on the nearest
 // thing you can eat, as a finger does in tap-and-move, on a phone-sized screen. It must reach level 2 in 100 s.
 // Also: every script and style link carries the build stamp, so a device does not keep an old cached copy.
@@ -868,8 +884,9 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'growth') await growth(browser, url);
     if (which === 'all' || which === 'schoolcap') await schoolCap(browser, url);
     if (which === 'all' || which === 'buttons') await buttonsAndMap(browser, url);
+    if (which === 'all' || which === 'smooth') await smoothness(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'notes', 'growth', 'schoolcap', 'buttons', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'notes', 'growth', 'schoolcap', 'buttons', 'smooth', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {
