@@ -124,7 +124,8 @@
 
   // ---------- canvas setup and background ----------
   function resize() {
-    DPR = Math.min(2, window.devicePixelRatio || 1);
+    // v0.12: cap the drawing buffer at about 2.2 million pixels. A retina iPad at 2x would otherwise fill 4x the pixels.
+    DPR = Math.min(2, window.devicePixelRatio || 1, Math.sqrt(2200000 / Math.max(1, window.innerWidth * window.innerHeight)));
     CW = window.innerWidth;
     CH = window.innerHeight;
     canvas.width = Math.round(CW * DPR);
@@ -912,7 +913,7 @@
   var ALLY_SHARE = 0.5;
   function allyCredit(meal) {
     var r = run, span = Math.max(0.5, r.info.meal), gain;
-    gain = meal.sp.kind === 'food' ? meal.size * 0.4 : Math.max(meal.size * 0.25, span / (r.info.n >= 20 ? 10 : 9));
+    gain = meal.sp.kind === 'food' ? meal.size * 0.4 : Math.max(meal.size * 0.25, span / mealDiv(r.info.n));
     gain *= ALLY_SHARE;
     r.size += gain;
     r.growPending = true;
@@ -996,14 +997,39 @@
     }
   }
 
+  // v0.12 spatial grid: each frame the fish are sorted into 300-unit cells, so a search looks at the cells near it
+  // instead of every fish (the all-pairs search was most of the frame time). The grid is a little stale while fish
+  // move within a frame, so searches reach one cell further than their radius.
+  var GRID = 300;
+  function buildGrid() {
+    var r = run, cols = Math.ceil(r.info.W / GRID), rows = Math.ceil(r.info.H / GRID), g = {}, i, o, k;
+    for (i = 0; i < r.npcs.length; i++) {
+      o = r.npcs[i];
+      if (o.dead) continue;
+      k = (Math.floor(wrapX(o.x) / GRID) % cols) + ',' + clamp(Math.floor(o.y / GRID), 0, rows - 1);
+      (g[k] = g[k] || []).push(o);
+    }
+    r.grid = { g: g, cols: cols, rows: rows };
+  }
+  // Calls fn for each fish that may be within rad of n (a superset: the caller checks the exact distance).
+  function eachNear(n, rad, fn) {
+    var grid = run.grid, dx, dy, gx, gy, cell, i;
+    if (!grid) { for (i = 0; i < run.npcs.length; i++) fn(run.npcs[i]); return; }
+    var cx = Math.floor(wrapX(n.x) / GRID), cy = clamp(Math.floor(n.y / GRID), 0, grid.rows - 1), k = Math.ceil(rad / GRID) + 1;
+    for (dx = -k; dx <= k; dx++) for (dy = -k; dy <= k; dy++) {
+      gx = ((cx + dx) % grid.cols + grid.cols) % grid.cols; gy = cy + dy;
+      if (gy < 0 || gy >= grid.rows) continue;
+      cell = grid.g[gx + ',' + gy];
+      if (cell) for (i = 0; i < cell.length; i++) fn(cell[i]);
+    }
+  }
   function findNear(n, rad, test) {
     var best = null, bd = rad;
-    for (var i = 0; i < run.npcs.length; i++) {
-      var o = run.npcs[i];
-      if (o === n || o.dead || !test(o)) continue;
+    eachNear(n, rad, function (o) {
+      if (o === n || o.dead || !test(o)) return;
       var d = distW(o, n);
       if (d < bd) { bd = d; best = o; }
-    }
+    });
     return best;
   }
 
@@ -1447,7 +1473,7 @@
     } else {
       // A level takes about nine fish meals at most: each meal gives at least a ninth of the level's size range.
       var span = Math.max(0.5, r.info.meal);
-      gain = n.sp.kind === 'food' ? n.size * 0.4 : Math.max(n.size * 0.25, span / (r.info.n >= 20 ? 10 : 9));   // level 20: ten meals (v0.9)
+      gain = n.sp.kind === 'food' ? n.size * 0.4 : Math.max(n.size * 0.25, span / mealDiv(r.info.n));   // level 20: ten meals (v0.9)
       r.size += gain;
       floatText(n.x, n.y, '+' + gain.toFixed(1));
       FishSound.play('eat');
@@ -1492,6 +1518,9 @@
   // v0.12: you eat plankton, krill and chum only up to level 4 (the start food). A fish under half your size is not food.
   var FOOD_LAST_LEVEL = 4, EDIBLE_MIN = 0.5;
   // v0.12: fish under this share of your size are not food. Half your size up to level 10, then 80%.
+  // v0.12 (family note 2026-11-08: levels 8-10 went up too fast, the EXP per fish was too big): a fish is a smaller
+  // share of a level from 8 to 10 (a twelfth of the span, not a ninth).
+  function mealDiv(n) { return n >= 20 ? 10 : (n >= 8 && n <= 10) ? 12 : 9; }
   // Levels 1-4 have no floor: there every wild fish is under half your size, so a floor left only plankton to eat.
   function edibleMin() { return run.info.n > 10 ? 0.8 : run.info.n >= 5 ? EDIBLE_MIN : 0; }
   function checkContact(n) {
@@ -1592,6 +1621,7 @@
       return !o.dead && (o.sp.kind === 'hunter' || o.sp.kind === 'ambush');
     });
     var i;
+    buildGrid();   // v0.12: for the searches in updateNPC
     for (i = 0; i < r.npcs.length; i++) {
       if (!r.npcs[i].dead) updateNPC(r.npcs[i], dt, predators);
     }
@@ -1601,23 +1631,25 @@
     // Fights between fish (v0.10): any fish bites any fish it touches, except food and its own species.
     // Each bite takes off the attacker's attack value; a fish is out when its health reaches zero.
     // An ally's kill feeds you (half a meal), and an ally that is killed counts as lost, not eaten.
+    buildGrid();   // the fish have moved since the grid was built
     for (i = 0; i < r.npcs.length; i++) {
       var eater = r.npcs[i];
       if (eater.dead || eater.biteT > 0 || !canBite(eater.sp)) continue;
-      for (var j = 0; j < r.npcs.length; j++) {
-        var meal = r.npcs[j];
-        if (meal === eater || meal.dead || meal.sp === eater.sp) continue;
+      var done = false;   // one meal (or one bite) per fish per frame, as before
+      eachNear(eater, 360, function (meal) {   // reach is at most 0.36 x two fish lengths, under 340 units
+        if (done || meal === eater || meal.dead || meal.sp === eater.sp) return;
         // v0.12: your school never fights itself, nothing bites it during the calm, and harmless creatures are not food.
-        if (eater.pod && meal.pod) continue;
-        if (meal.pod && r.calmT > 0) continue;
-        if (meal.sp.kind === 'harmless') continue;
+        if (eater.pod && meal.pod) return;
+        if (meal.pod && r.calmT > 0) return;
+        if (meal.sp.kind === 'harmless') return;
         var md = distW(eater, meal);
         if (md < (lenFor(eater.size, eater.sp.shape) + lenFor(meal.size, meal.sp.shape)) * 0.36) {
+          done = true;
           if (meal.sp.kind === 'food') {   // v0.11: small fish eat plankton and chum they touch
             meal.dead = true; eater.biteT = Math.max(eater.biteT, 0.3); r.fedFish = (r.fedFish || 0) + 1;
             burst(meal.x, meal.y, meal.sp.col || '#ffffff', 3);
             if (eater.ally) healAlly(eater, 1);
-            break;
+            return;
           }
           eater.biteT = STRIKE_S;
           meal.hp -= atkOf(eater.size);
@@ -1630,9 +1662,8 @@
             dropChum(meal);
             if (eater.ally) allyCredit(meal);
           }
-          break;
         }
-      }
+      });
     }
 
     tendFollowers(dt);   // v0.12: friends join, and followers over the limit are released
@@ -1802,6 +1833,12 @@
     if (playerVisible) {
       list.push({ x: run.x, y: run.y, vy: run.vy, facing: run.facing, size: run.size, desc: playerDesc(), isPlayer: true, hp: run.hp, maxHp: run.maxHp });
     }
+    // v0.12: only what is on screen (plus its own length) is drawn. The sea has hundreds of fish, most of them off screen.
+    var hw = CW / 2 / cam.scale + 60, hh = CH / 2 / cam.scale + 60;
+    list = list.filter(function (e) {
+      var m = lenFor(e.size, (e.isPlayer ? e.desc : e.desc || e.sp).shape);
+      return Math.abs(dxW(e.x, cam.x)) < hw + m && Math.abs(e.y - cam.y) < hh + m;
+    });
     list.sort(function (a, b) { return a.size - b.size; });
     list = list.map(function (e) { return Object.assign({}, e, { x: viewX(e.x) }); });
     list.forEach(function (e) { drawEntity(e, t + (e.t || 0)); });
@@ -2472,6 +2509,20 @@
       });
       return { all: all, near: near, target: best ? { kind: best.sp.kind, id: best.sp.id, dist: Math.round(bd),
         sx: CW / 2 + dxW(best.x, cam.x) * cam.scale, sy: CH / 2 + (best.y - cam.y) * cam.scale } : null };
+    },
+    // Test hook (v0.12): the grid's nearest-fish search against a brute-force search, for 40 fish in the sea.
+    debugGridCheck: function () {
+      if (!run) return null;
+      buildGrid();
+      var bad = 0, n = 0, i;
+      for (i = 0; i < run.npcs.length && n < 40; i += Math.max(1, Math.floor(run.npcs.length / 40))) {
+        var q = run.npcs[i], best = null, bd = 400;
+        run.npcs.forEach(function (o) { if (o === q || o.dead) return; var d = distW(o, q); if (d < bd) { bd = d; best = o; } });
+        var g = findNear(q, 400, function () { return true; }), gd = g ? distW(g, q) : 400;
+        if (Math.abs(gd - bd) > 1e-6) bad++;
+        n++;
+      }
+      return { checked: n, mismatches: bad, fish: run.npcs.length };
     },
     debugTide: function () { if (run && mode === 'play') { run.tideNext = run.t; run.calmT = 0; } },
     // Test hook: each form of level n and its chance for a play style (a = biting, s = swimming, h = allies).

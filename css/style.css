@@ -17,6 +17,9 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
 
+/* v0.12: the page's text size stays put: the HUD and buttons are sized in pixels and screen units, not in the browser's text
+   size, so a 50% or 100% text setting does not change the play area. */
+html { font-size: 16px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 html, body {
   margin: 0;
   height: 100%;
