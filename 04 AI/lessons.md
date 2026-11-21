@@ -38,3 +38,13 @@
 - **Random forms break tests that assume a species.** Once your form is picked at random, a test that spawns "a round fish like you" by name fails at random. Spawn your own form (`state().form`) instead.
 - **A fix can be merged and still not reach the device.** "I can't eat anything at levels 1-2" came after the fix was merged, while a bot grew to level 2 in under a minute. Both builds said v0.11, and the scripts had no cache stamp, so a device could keep the old `game.js`. Every script and style link now carries `?b=` + `CONFIG.BUILD`, and the title shows the build. Ask which build the device shows before chasing a bug that tests cannot reproduce.
 - **Never type a commit SHA into a merge.** A made-up SHA was rejected, but only because GitHub refused it for the conflicts first. Take the full SHA from `git rev-parse HEAD` each time.
+
+## Balance lab (added 2026-11-21)
+
+- **Measure balance with `tools/balance.js`, not by feel.** It plays whole games headless at about 30x real time with a bot (novice, average, expert) and reports run length, seconds per level, lives lost and what took them. A 36-game sweep takes about 10 minutes. Try a change first with `--tune key=value` (any key in `TUNING`, js/species.js), then make it the default.
+- **A size rescale must cover every table.** v0.10 tripled the start size and the level goals but not the species sizes, so from level 13 nothing in the sea was big enough to eat or to fear. Probe the sea at a late level (census of edible and threat) after any change to sizes.
+- **A narrow edible band needs the spawner to aim for it.** "Eat only fish 80-87% of your size" left the spawner with no species that fitted, so it stopped spawning. Pick species with tolerance, then size the new fish into its role's band (`fitRole`).
+- **A min with no max broke the meal rule.** `max(prey x 0.25, span / 9)` let one big fish give two levels at levels 5-10. Clamp both ways (`mealGain`).
+- **A fixed number scales badly with size.** Regeneration of 3 health a second was 14% at level 1 and under 2% at level 15. Use a share of max health.
+- **A grid search with a whole cell of slack is 5x the work.** 7 x 7 cells for a 300 radius; the fish only move a few units a frame. Profile with a CDP CPU profile (see the 0.12 balance PR) before guessing.
+- **Don't edit the game while a balance run is going.** Every new run loads the files fresh, so an edit mid-sweep mixes two versions in one report. Write new code in a new file, or wait.

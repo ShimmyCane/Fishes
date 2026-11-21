@@ -1,13 +1,15 @@
 
 - [x] Round 5: each level at most about nine fish meals; your school from level 10 (v0.7)
 - [x] Release 0.10 (2026-11-07), and 0.11 changes merged to `main` ahead of its release (see CHANGELOG 0.11)
-- [ ] Check the run length of a full game against 8–15 minutes (see convo v0.6). Needs one timed full game on a device: the 0.10 pacing (levels 1–5 need 3× the growth) may have moved this.
+- [x] Check the run length with a bot (tools/balance.js, 2026-11-21): Medium reaches level 20 in 11–15 minutes after the tuning in CHANGELOG 0.12. Still wanted: one timed full game on a device.
 - [ ] Next milestone (see 04 AI/brief.md and .claude/skills/fishes-sea-creatures):
   - [x] Other ocean elements: anemones and kelp doubled; currents; gulls, turtles, crabs and moon jellyfish (v0.11)
   - [x] Smarter sea creatures: small fish eat plankton, plankton flees fish, hunters look further on deeper levels (v0.11)
-  - [ ] Graphics: depth light, bubbles, a richer seabed. Art direction needs your choice (two options each).
+  - [x] Graphics: realistic fish (js/fishart.js), depth-darkening water, sun rays, caustics, marine snow, a detailed seabed (2026-11-21). Needs a look on the iPad.
   - [ ] Frame budget on older iPads: not measured on a device yet (headless: about 54–60 fps at level 18 with the denser sea).
 - [ ] Play-test allies on iPad: EXP share, leash distance, price clarity, the teal ring, heal and the Attack button
 - [ ] Play-test the 0.11 layout on iPad: buttons about twice as wide, mini map top right (short landscape screens keep it top left)
 - [ ] Family database: a successful sign-in and a saved note on the iPad (Jimmy). Not verified: the sandbox cannot reach supabase.co from the browser.
-- [ ] Playtest flake: one full run in the 0.10 release check had one failing check that was not captured. Find out which of the allies or Attack checks it is, and make it robust.
+- [ ] Playtest flake: one full run in the 0.10 release check had one failing check that was not captured. Found and fixed two (2026-11-21): the jellyfish check parked you just outside your reach, and the own-species check failed when another fish bit the test fish. Watch for more.
+- [ ] Hard: bots usually reach about level 15–16 by the 15-minute cap (Medium finishes). Decide whether Hard should be finishable.
+- [ ] Try a full game on the iPad: frame rate with the new drawing, and whether the deep zones are too dark to see fish.

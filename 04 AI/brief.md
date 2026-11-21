@@ -1,6 +1,6 @@
 # Fishes — Brief (AI notes)
 
-**Updated:** 2026-11-05
+**Updated:** 2026-11-21
 
 ## Current state
 
@@ -60,3 +60,4 @@ Open questions for the user: art direction (two options each), how far to push t
 - **Creatures (v0.11):** turtle and crab (tier 1, harmless, never hunt; crabs keep to the seabed), moon jellyfish (tier 3, harmless kind with `sting: true`: touching one costs 2 health every 1.5 s, and it cannot be eaten or bitten by you). Gulls are scenery only, in `run.birds`, shown when you are near the surface. A few of each are kept per level by `fillCreatures`. Options not taken: stinging or biting turtles, seabirds that dive for fish.
 - **Pacing and allies (v0.11):** levels 1–5 need 3× the growth (`SPAN_BASE` × 3), later levels 0.87× so the largest fish stays about 300. A meal's growth stays the same (`levelInfo.meal`), so early levels need more food. Allies heal after 4 s without a hit (a third of max health a second). Attack (8 s, 20 s cooldown) sends allies at the fish you last bit. Allies and the level-10 school are both pods; allies are marked with a teal ring and only bought allies are counted. Fish eat plankton and chum they touch; plankton scatters from fish that swim close. The sea is at least as wide as the camera needs on a landscape phone (`seaWidth` in species.js).
 - **Trash (v0.11):** a family setting (`fish_trash`, default on). Four tier-1 harmless debris kinds (sock, underwear, toy car, plastic bottle) use `sting: true`, so touching one costs 2 health every 1.5 s and it cannot be eaten. Turning it off removes it at once (`fillCreatures`). Future idea: a family habit or a database table that tracks how clean the room is, shown as the ratio of trash in the sea.
+- **Realism and balance (2026-11-21, 0.12 unreleased):** fish are drawn by `js/fishart.js` (body plans, fins, markings, swim motion; `LOOKS[id]` holds each species' look; drawing only, no rules). The sea darkens with depth, has sun rays, caustics, marine snow, a detailed seabed and zone-specific growth (`ZONES` light/kelp/reef in species.js; `makeReef`, `drawReef` in game.js). Balance knobs moved to `TUNING` in species.js and are measured with `tools/balance.js` (see lessons). `tools/gallery.html` shows every species as drawn. Measured after tuning (4 games per cell): Medium 10/12 bot games reach level 20 in 11-15 min with about 1 life lost; Hard usually ends at the time cap around level 15-16; Easy stops at 5:00 around level 10-11.

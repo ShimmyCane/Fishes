@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fishes gallery</title>
+<style>
+  body { margin: 0; background: #0f3d5c; color: #e8f4f8; font: 13px system-ui, sans-serif; }
+  header { padding: 12px 16px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; padding: 0 16px 24px; }
+  .cell { background: linear-gradient(#2a8fb8, #145a80); border-radius: 8px; padding: 6px; }
+  .cell canvas { width: 100%; height: 120px; display: block; }
+  .name { font-weight: 600; } .meta { opacity: 0.75; font-size: 11px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Fishes — every species, as the game draws it</h1>
+  <div>Open from the repo folder (tools/gallery.html). <label><input type="checkbox" id="anim" checked> animate</label>
+    · <label>tier <select id="tier"><option value="">all</option></select></label></div>
+</header>
+<div id="grid"></div>
+<script src="../js/species.js"></script>
+<script src="../js/fishart.js"></script>
+<script>
+  var D = window.FishData, cells = [], DPR = Math.min(2, window.devicePixelRatio || 1);
+  var skip = { plankton: 1, krill: 1, trash: 1, crab: 1, clam: 1, rock: 1, boat: 1, sub: 1, urchin: 1, shrimp: 1 };
+  var sel = document.getElementById('tier');
+  for (var n = 1; n <= 20; n++) { var op = document.createElement('option'); op.value = n; op.textContent = n + ' ' + D.LEVEL_NAMES[n - 1]; sel.appendChild(op); }
+  function build() {
+    var grid = document.getElementById('grid'); grid.innerHTML = ''; cells = [];
+    D.SPECIES.filter(function (sp) { return !skip[sp.shape] && (!sel.value || sp.tier === +sel.value); })
+      .sort(function (a, b) { return a.tier - b.tier || a.size - b.size; })
+      .forEach(function (sp) {
+        var div = document.createElement('div'); div.className = 'cell';
+        var c = document.createElement('canvas'); div.appendChild(c);
+        var lk = FishArt.lookOf(sp) || {};
+        div.insertAdjacentHTML('beforeend', '<div class="name">' + sp.name + '</div><div class="meta">tier ' + sp.tier + ' · ' + sp.kind + ' · ' +
+          sp.temper + ' · ' + (lk.body || sp.shape) + (sp.build ? ' · form: ' + sp.build : '') + '</div>');
+        grid.appendChild(div); cells.push({ c: c, sp: sp, ph: Math.random() });
+      });
+  }
+  sel.onchange = build;
+  build();
+  var last = 0;
+  function frame(ts) {
+    var t = ts / 1000, dt = Math.min(0.05, last ? t - last : 0); last = t;
+    var anim = document.getElementById('anim').checked;
+    cells.forEach(function (cl) {
+      var c = cl.c, w = c.clientWidth, h = c.clientHeight;
+      if (c.width !== Math.round(w * DPR)) { c.width = Math.round(w * DPR); c.height = Math.round(h * DPR); }
+      var ctx = c.getContext('2d');
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, w, h);
+      if (anim) cl.ph += dt * FishArt.beat(60, 120);
+      var len = cl.sp.shape === 'oar' ? w * 0.75 : w * 0.5;
+      ctx.save(); ctx.translate(w * 0.52, h * 0.52);
+      FishArt.draw(ctx, cl.sp, len, { t: anim ? t : 0, ph: cl.ph, sw: 0.7, lw: 1.6, px: len });
+      ctx.restore();
+    });
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+</script>
+</body>
+</html>

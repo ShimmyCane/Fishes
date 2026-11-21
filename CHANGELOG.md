@@ -3,6 +3,19 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.12 — unreleased
+- **A more realistic sea.** Every fish is drawn from its real body plan: reef fish, tuna with finlets and a crescent tail, sharks with gill slits and a longer top tail lobe, marlin and sailfish with bills, eels, flatfish, the ocean sunfish, the manta ray, anglerfish with glowing lures. Each has its own markings and natural colours (dark back, pale belly): the clownfish's white bands, the blue tang's black "palette", the mackerel's wavy bars, the great white's grey back and white belly, the whale shark's spots.
+- **Fish swim.** The tail beats faster when a fish swims hard and slower when it is big, the side fins row, and the body flexes. Jellyfish pulse, turtles row with their flippers, plankton is tiny see-through copepods.
+- **The water darkens as you go deeper**, from turquoise shallows to the black trench. Sun rays shine down from the surface, light ripples over the sand, specks of marine snow drift past, and in the twilight and the trench a faint light goes with you.
+- **The seabed** has sand ripples and pebbles, a far ridge behind it, sea grass in the shallows, golden-brown giant kelp, coral (brain, staghorn, table, sea fans, tube sponges) on the reef, glass sponges in the twilight and tube worms in the trench. Anemones look like real anemones.
+- **Fixed: from level 13 on the sea was empty.** Nothing was big enough to eat or to be afraid of, so a run could not get past about level 12. Wild fish are now sized to match you, as the level goals are.
+- **Pacing (measured with the new balance lab):** a level now takes about half a minute (3 to 5 fish meals), so a Medium run reaches level 20 in about 11 to 15 minutes. Before, a level took 5 to 9 meals and a run reached about level 10 by the 15-minute mark.
+- Level 5 needs as much growth as its neighbours (it needed three times as much, and took 2 to 5 minutes). The final size is still 300.
+- A fish less than half your size no longer bites you. Packs of small tuna you could not bite back were taking most lives at levels 9 and 10.
+- Your bite is twice as strong, and fish from level 10 no longer have double health, so a meal takes about 3 to 5 bites instead of 8 to 16.
+- You have 30% more health, and you heal 8% of your health a second after four seconds without a hit (it was a flat 3 a second, which was very slow late in the game).
+- Hard adds predators on top of the same food, so it is more dangerous, not just slower.
+- When you grow past the old fish, the small ones far away swim off, so new fish your size come in.
+- Smoother play: the update is about three times faster (the sea keeps fewer plankton and chum bits after level 4, and each fish looks only at the fish near it).
 - On tablets the action buttons (Ally, Attack, Sprint) and the settings button are compact: about half their former width, so most of the screen is sea. Phones keep their sizes.
 - Smoother play. The game sorts the fish into a grid each frame, so each fish checks only the fish near it, not the whole sea. Fish off screen are not drawn. On a retina iPad the drawing buffer is capped at about 2.2 million pixels, so the sea is drawn at a steady rate.
 - The text size of the page no longer changes the size of the play area. The HUD and buttons are sized in pixels and screen units.

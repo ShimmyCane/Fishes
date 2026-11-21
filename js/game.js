@@ -135,16 +135,22 @@
     canvas.height = Math.round(CH * DPR);
     canvas.style.width = CW + 'px';
     canvas.style.height = CH + 'px';
+    // v0.13: marine snow (fine drifting specks, in two depths of parallax) and a few small rising bubbles.
     bubbles = [];
-    for (var i = 0; i < 28; i++) {
-      bubbles.push({ x: Math.random(), y: Math.random(), r: rand(2, 7), s: rand(0.02, 0.07), p: Math.random() * 6 });
+    for (var i = 0; i < 70; i++) {
+      bubbles.push({ x: Math.random(), y: Math.random(), r: rand(0.6, 1.8), s: rand(0.004, 0.015), p: Math.random() * 6, z: Math.random() < 0.5 ? 0.35 : 0.7, a: rand(0.18, 0.45) });
     }
+    for (i = 0; i < 8; i++) bubbles.push({ x: Math.random(), y: Math.random(), r: rand(1.5, 3.5), s: -rand(0.05, 0.1), p: Math.random() * 6, z: 1, a: 0.5, bubble: true });
   }
 
+  // v0.13: the water darkens with depth. The screen shows the colour of the water at the depth it is looking at,
+  // from the zone's surface colour to its seabed colour, so swimming down feels like going deeper.
+  function waterAt(z, y) { return hexMix(z.top, z.bottom, clamp(y / (run ? run.info.H : 2000), 0, 1)); }
   function paintSea(z) {
+    var y0 = run ? cam.y - CH / 2 / cam.scale : 0, y1 = run ? cam.y + CH / 2 / cam.scale : 2000;
     var g = ctx.createLinearGradient(0, 0, 0, CH);
-    g.addColorStop(0, z.top);
-    g.addColorStop(1, z.bottom);
+    g.addColorStop(0, waterAt(z, y0));
+    g.addColorStop(1, waterAt(z, y1));
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, CW, CH);
   }
@@ -157,247 +163,58 @@
       paintSea(run.zoneOld);
       ctx.globalAlpha = 1;
     }
-
-    if (z.rays) {
-      ctx.fillStyle = 'rgba(255,255,255,0.10)';
-      for (var i = 0; i < 5; i++) {
-        var x = CW * (0.12 + i * 0.2) + Math.sin(t * 0.4 + i) * 30;
-        ctx.beginPath();
-        ctx.moveTo(x, 0); ctx.lineTo(x + 50, 0); ctx.lineTo(x + 170, CH); ctx.lineTo(x + 110, CH);
-        ctx.closePath(); ctx.fill();
-      }
-    }
-
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-    ctx.lineWidth = 2;
+    // Marine snow drifts down slowly (two layers, the far one slower and fainter); a few bubbles rise.
+    var px = run ? cam.x * cam.scale : 0, py = run ? cam.y * cam.scale : 0, deep = run ? run.info.zoneIndex >= 3 : false;
     bubbles.forEach(function (b) {
-      var y = (((b.y - t * b.s) % 1) + 1) % 1;
-      ctx.beginPath();
-      ctx.arc(b.x * CW + Math.sin(t + b.p) * 10, y * CH, b.r, 0, Math.PI * 2);
-      ctx.stroke();
+      var y = ((((b.y - t * b.s) * CH - py * b.z * 0.15) % CH) + CH) % CH;
+      var x = ((((b.x * CW + Math.sin(t * 0.5 + b.p) * 8) - px * b.z * 0.15) % CW) + CW) % CW;
+      if (b.bubble) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(x, y, b.r, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.arc(x - b.r * 0.35, y - b.r * 0.35, b.r * 0.3, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.fillStyle = deep ? 'rgba(190,230,255,' + (b.a * 0.8).toFixed(2) + ')' : 'rgba(240,250,255,' + b.a.toFixed(2) + ')';
+        ctx.fillRect(x, y, b.r * b.z * 1.6, b.r * b.z * 1.6);
+      }
     });
-
   }
 
-  // ---------- drawing fish (local coords: nose to the right, origin = centre) ----------
-  function genericFish(len, hr, d, t, lw) {
-    var L = len / 2, Hh = len * hr / 2;
-    var col = d.col, fin = d.fin || col, tail = d.tail || fin;
-    var fh = d.finH || 1;
-    var wig = Math.sin(t * 13) * Hh * 0.35;
-
-    ctx.lineWidth = lw;
-    ctx.strokeStyle = OUT;
-    ctx.lineJoin = 'round';
-
-    ctx.fillStyle = tail;
-    ctx.beginPath();
-    ctx.moveTo(-L * 0.7, 0);
-    ctx.quadraticCurveTo(-L * 1.05, -Hh * 0.9 + wig, -L * 1.4, -Hh * 1.1 + wig);
-    ctx.quadraticCurveTo(-L * 1.2, wig * 0.2, -L * 1.4, Hh * 1.1 + wig);
-    ctx.quadraticCurveTo(-L * 1.05, Hh * 0.9 + wig, -L * 0.7, 0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = fin;
-    ctx.beginPath();
-    ctx.moveTo(-L * 0.35, -Hh * 0.7);
-    ctx.quadraticCurveTo(-L * 0.05, -Hh * (0.9 + 0.8 * fh), L * 0.3, -Hh * 0.6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    var g = ctx.createLinearGradient(0, -Hh, 0, Hh);
-    g.addColorStop(0, hexMix(col, '#ffffff', 0.35));
-    g.addColorStop(0.6, col);
-    g.addColorStop(1, hexMix(col, OUT, 0.22));
-    ctx.beginPath();
-    ctx.ellipse(0, 0, L, Hh, 0, 0, Math.PI * 2);
-    ctx.fillStyle = g;
-    ctx.fill();
-
+  // v0.13: shafts of sunlight from the surface, fading with depth (shallow zones only). Drawn in world space.
+  function drawRays(z, t) {
+    if (!z.light) return;
+    var halfW = CW / 2 / cam.scale, x0 = cam.x - halfW - 400, x1 = cam.x + halfW + 400, step = 260, i;
+    var depth = 1100 * z.light + 300;
+    if (cam.y - CH / 2 / cam.scale > depth) return;
     ctx.save();
-    ctx.clip();
-    if (d.belly) {
-      ctx.fillStyle = d.belly;
-      ctx.beginPath();
-      ctx.ellipse(0, Hh * 0.8, L * 1.05, Hh * 0.6, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    if (d.stripe) {
-      ctx.fillStyle = d.stripe;
-      ctx.fillRect(-L, -Hh * 0.12, len, Hh * 0.26);
-    }
-    if (d.bands) {
-      ctx.fillStyle = d.bandCol || '#ffffff';
-      d.bands.forEach(function (bx) { ctx.fillRect(bx * L - L * 0.09, -Hh * 1.2, L * 0.18, Hh * 2.4); });
-    }
-    if (d.spots) {
-      ctx.fillStyle = d.spotCol || '#ffffff';
-      for (var i = 0; i < 12; i++) {
-        var sx = (-0.8 + (i % 4) * 0.5) * L + ((i * 37) % 7) * 0.02 * L;
-        var sy = (-0.5 + Math.floor(i / 4) * 0.5) * Hh;
-        ctx.beginPath();
-        ctx.arc(sx, sy, Math.max(1.2, Hh * 0.12), 0, Math.PI * 2);
-        ctx.fill();
-      }
+    ctx.globalCompositeOperation = 'lighter';
+    var g = ctx.createLinearGradient(0, 0, 0, depth);
+    g.addColorStop(0, 'rgba(255,255,235,' + (0.16 * z.light).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(255,255,235,0)');
+    ctx.fillStyle = g;
+    for (i = Math.floor(x0 / step); i * step < x1; i++) {
+      var bx = i * step + 90 * Math.sin(i * 1.7) + 40 * Math.sin(t * 0.25 + i), w = 30 + 40 * (0.5 + 0.5 * Math.sin(i * 2.3 + t * 0.4));
+      ctx.beginPath(); ctx.moveTo(bx, 0); ctx.lineTo(bx + w, 0); ctx.lineTo(bx + w + depth * 0.35, depth); ctx.lineTo(bx + depth * 0.3, depth); ctx.closePath(); ctx.fill();
     }
     ctx.restore();
-
-    ctx.beginPath();
-    ctx.ellipse(0, 0, L, Hh, 0, 0, Math.PI * 2);
-    ctx.lineWidth = lw;
-    ctx.strokeStyle = OUT;
-    ctx.stroke();
-
-    ctx.fillStyle = fin;
-    ctx.beginPath();
-    ctx.ellipse(L * 0.1, Hh * 0.35, L * 0.22, Hh * 0.28, 0.5 + Math.sin(t * 9) * 0.45, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    if (d.spiky) {
-      ctx.lineWidth = lw * 0.8;
-      for (var k = 0; k < 10; k++) {
-        var a = k / 10 * Math.PI * 2;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(a) * L * 0.98, Math.sin(a) * Hh * 0.98);
-        ctx.lineTo(Math.cos(a) * (L + 3), Math.sin(a) * (Hh + 3));
-        ctx.stroke();
-      }
-    }
-
-    var er = Math.max(2.2, Hh * 0.2), ex = L * 0.45, ey = -Hh * 0.18;
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(ex, ey, er, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.lineWidth = lw * 0.8;
-    ctx.stroke();
-    ctx.fillStyle = OUT;
-    ctx.beginPath();
-    ctx.arc(ex + er * 0.25, ey, er * 0.55, 0, Math.PI * 2);
-    ctx.fill();
   }
 
-  function eelFish(len, d, t, lw) {
-    var L = len / 2, th = Math.max(2.5, len * 0.075), pts = [];
-    for (var i = 0; i <= 16; i++) {
-      var u = i / 16;
-      pts.push([-L + u * len, Math.sin(u * 5 - t * 6) * len * 0.07 * (0.3 + u)]);
-    }
-    var path = function () {
-      ctx.beginPath();
-      ctx.moveTo(pts[0][0], pts[0][1]);
-      for (var j = 1; j < pts.length; j++) ctx.lineTo(pts[j][0], pts[j][1]);
-    };
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    path();
-    ctx.strokeStyle = OUT;
-    ctx.lineWidth = th + lw * 2;
-    ctx.stroke();
-    path();
-    ctx.strokeStyle = d.col;
-    ctx.lineWidth = th;
-    ctx.stroke();
-    var hx = pts[16][0], hy = pts[16][1], er = Math.max(2, th * 0.45);
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(hx - th * 0.3, hy - th * 0.3, er, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = OUT;
-    ctx.beginPath();
-    ctx.arc(hx - th * 0.1, hy - th * 0.3, er * 0.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  function lureFish(len, d, t, lw) {
-    var L = len / 2, Hh = len * d.hr / 2;
-    var lx = L * 0.35, ly = -Hh * 0.9;
-    var tipx = L * 0.85, tipy = -Hh * 2.3 - len * 0.02 * Math.sin(t * 3);
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = OUT;
-    ctx.lineWidth = lw * 2.4;
-    ctx.beginPath();
-    ctx.moveTo(lx, ly);
-    ctx.quadraticCurveTo(lx + L * 0.2, -Hh * 1.8, tipx, tipy);
-    ctx.stroke();
-    ctx.strokeStyle = '#e7dcff';
-    ctx.lineWidth = lw;
-    ctx.stroke();
-    var gr = ctx.createRadialGradient(tipx, tipy, 0, tipx, tipy, len * 0.2);
-    gr.addColorStop(0, 'rgba(255,246,190,1)');
-    gr.addColorStop(1, 'rgba(255,246,190,0)');
-    ctx.fillStyle = gr;
-    ctx.beginPath();
-    ctx.arc(tipx, tipy, len * 0.2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#fff6be';
-    ctx.beginPath();
-    ctx.arc(tipx, tipy, Math.max(2, len * 0.035), 0, Math.PI * 2);
-    ctx.fill();
-    genericFish(len, d.hr, d, t, lw);
-    ctx.fillStyle = '#ffffff';
-    for (var i = 0; i < 4; i++) {
-      var tx = L * (0.72 + i * 0.07);
-      ctx.beginPath();
-      ctx.moveTo(tx, Hh * 0.15);
-      ctx.lineTo(tx + L * 0.03, Hh * 0.5);
-      ctx.lineTo(tx + L * 0.06, Hh * 0.15);
-      ctx.fill();
+  // v0.13: the edges of the view fade into the water, and in the dark zones a soft light goes with you.
+  function drawVignette(z) {
+    var r = Math.hypot(CW, CH) / 2, g = ctx.createRadialGradient(CW / 2, CH / 2, r * 0.45, CW / 2, CH / 2, r);
+    var deep = z === D.ZONES[4] ? 0.55 : z === D.ZONES[3] ? 0.4 : 0.22;
+    g.addColorStop(0, 'rgba(0,10,25,0)'); g.addColorStop(1, 'rgba(0,10,25,' + deep + ')');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, CW, CH);
+    if (run && run.info.zoneIndex >= 3) {
+      var sx = CW / 2 + dxW(run.x, cam.x) * cam.scale, sy = CH / 2 + (run.y - cam.y) * cam.scale, rr = lenFor(run.size, 'round') * cam.scale * 2.2;
+      var lg = ctx.createRadialGradient(sx, sy, 0, sx, sy, rr);
+      lg.addColorStop(0, 'rgba(150,220,255,0.14)'); lg.addColorStop(1, 'rgba(150,220,255,0)');
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = lg; ctx.fillRect(sx - rr, sy - rr, rr * 2, rr * 2); ctx.restore();
     }
   }
 
-  function lanternFish(len, d, t, lw) {
-    genericFish(len, d.hr, d, t, lw);
-    var L = len / 2, Hh = len * d.hr / 2;
-    for (var i = 0; i < 6; i++) {
-      var x = (-0.6 + i * 0.24) * L, y = Hh * 0.55, r = Math.max(2, Hh * 0.9);
-      var gr = ctx.createRadialGradient(x, y, 0, x, y, r);
-      gr.addColorStop(0, 'rgba(190,255,255,0.95)');
-      gr.addColorStop(1, 'rgba(190,255,255,0)');
-      ctx.fillStyle = gr;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  // v0.11 creatures. Drawn in the fish's own space: the body is about len long, facing right.
-  function jellyFish(len, d, t, lw) {
-    var R = len * 0.4, pulse = 1 + 0.12 * Math.sin(t * 3), i, k;
-    ctx.globalAlpha = 0.9;
-    ctx.fillStyle = d.col; ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.8;
-    ctx.beginPath(); ctx.ellipse(0, 0, R * pulse, R * 0.8 / pulse, 0, Math.PI, 0); ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = d.fin; ctx.lineWidth = lw * 0.6;
-    for (i = 0; i < 5; i++) {
-      var x0 = -R * 0.8 + i * R * 0.4, wob = Math.sin(t * 2 + i) * R * 0.2;
-      ctx.beginPath(); ctx.moveTo(x0, 0);
-      for (k = 1; k <= 2; k++) ctx.bezierCurveTo(x0 + wob, R * 0.5 * k, x0 - wob, R * 0.5 * k + R * 0.25, x0, R * 0.6 * k + R * 0.5);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  function turtleShape(len, d, t, lw) {
-    var L = len / 2, H = len * 0.32, paddle = Math.sin(t * 2) * 0.6;
-    ctx.lineWidth = lw * 0.8; ctx.strokeStyle = OUT;
-    ctx.fillStyle = d.belly || '#e8e0b0';
-    ctx.beginPath(); ctx.ellipse(L * 0.95, 0, L * 0.22, H * 0.28, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();   // head
-    ctx.fillStyle = d.fin;
-    [[L * 0.35, 1, 0.5], [L * 0.35, -1, 0.5], [-L * 0.55, 1, 0.35], [-L * 0.55, -1, 0.35]].forEach(function (f) {   // flippers
-      ctx.save(); ctx.translate(f[0], f[1] * H * 0.9); ctx.rotate(f[1] * (paddle + 0.3));
-      ctx.beginPath(); ctx.ellipse(0, 0, L * f[2], H * 0.22, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
-    });
-    ctx.fillStyle = d.col;
-    ctx.beginPath(); ctx.ellipse(0, 0, L, H, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();   // shell
-    ctx.strokeStyle = d.fin; ctx.lineWidth = lw * 0.7;
-    ctx.beginPath(); ctx.ellipse(0, 0, L * 0.55, H * 0.55, 0, 0, Math.PI * 2); ctx.stroke();
-  }
-
+  // ---------- drawing (local coords: nose to the right, origin = centre) ----------
+  // v0.13: every fish, the jellyfish, turtles and squid are drawn by js/fishart.js (FishArt), realistically and with
+  // a swimming motion. The shapes below are the creatures and items it leaves to the game.
   function crabShape(len, d, t, lw) {
     var W = len / 2, H = len * 0.3, i, side;
     ctx.lineWidth = lw * 0.7; ctx.strokeStyle = OUT;
@@ -506,20 +323,6 @@
     ctx.fillStyle = d.fin; ctx.beginPath(); ctx.moveTo(-L * 0.9, 0); ctx.lineTo(-L * 1.25, -H * 0.9); ctx.lineTo(-L * 1.25, H * 0.9);
     ctx.closePath(); ctx.fill(); ctx.stroke();
   }
-  function squidShape(len, d, t, lw) {   // a squid: a long mantle, a fin, and tentacles that trail and wave
-    var L = len / 2, H = len * 0.13, i, y0, wv;
-    ctx.lineCap = 'round'; ctx.strokeStyle = d.fin; ctx.lineWidth = lw * 0.9;
-    for (i = 0; i < 6; i++) {
-      y0 = (i - 2.5) * H * 0.35; wv = Math.sin(t * 4 + i) * H * 0.5;
-      ctx.beginPath(); ctx.moveTo(-L * 0.35, y0); ctx.quadraticCurveTo(-L * 0.8, y0 + wv, -L * 1.0, y0 + wv * 1.5); ctx.stroke();
-    }
-    ctx.fillStyle = d.col; ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.8;
-    ctx.beginPath(); ctx.ellipse(-L * 0.1, 0, L * 0.7, H * 1.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = d.fin; ctx.beginPath(); ctx.moveTo(-L * 0.6, 0); ctx.lineTo(-L * 0.85, -H * 1.3); ctx.lineTo(-L * 0.85, H * 1.3);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(L * 0.35, -H * 0.2, Math.max(1.5, H * 0.35), 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#1d2a33'; ctx.beginPath(); ctx.arc(L * 0.37, -H * 0.2, Math.max(1, H * 0.15), 0, Math.PI * 2); ctx.fill();
-  }
   function urchinShape(len, d, t, lw) {   // a round body with spines all round (the spines are the protection)
     var R = len * 0.3, i, a, r2;
     ctx.lineCap = 'round'; ctx.strokeStyle = d.fin; ctx.lineWidth = lw * 0.9;
@@ -547,43 +350,21 @@
     try { return localStorage.getItem('fish_trash') !== 'off'; } catch (e) { return true; }
   }
 
-  function oarFish(len, d, t, lw) {
-    var L = len / 2, Hh = Math.max(2, len * d.hr / 2), wv = Math.sin(t * 2) * Hh * 0.4;
-    ctx.fillStyle = d.fin;
-    ctx.lineWidth = lw * 0.8;
-    ctx.strokeStyle = OUT;
-    for (var i = 0; i < 16; i++) {
-      var x = -L * 0.9 + i * (L * 1.8 / 16);
-      ctx.beginPath();
-      ctx.moveTo(x, -Hh * 0.6);
-      ctx.lineTo(x + L * 0.04, -Hh * 2.2 + wv);
-      ctx.lineTo(x + L * 0.08, -Hh * 0.6);
-      ctx.closePath();
-      ctx.fill();
-    }
-    ctx.beginPath();
-    ctx.ellipse(0, 0, L, Hh, 0, 0, Math.PI * 2);
-    ctx.fillStyle = d.col;
-    ctx.fill();
-    ctx.lineWidth = lw;
-    ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(L * 0.9, -Hh * 0.2, Math.max(2, Hh * 0.5), 0, Math.PI * 2);
-    ctx.fill();
-  }
-
+  // v0.13: plankton as tiny see-through copepods (a teardrop body, two long feelers), chum as ragged red bits.
   function planktonDraw(len, d) {
-    var r = Math.max(2, len * 0.5);
-    ctx.globalAlpha = 0.9;
-    ctx.fillStyle = d.col;
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = '#a8d8ea';
-    ctx.lineWidth = 0.8;
-    ctx.stroke();
+    var r = Math.max(1.5, len * 0.28);
+    if (d.id === 'chum') {
+      ctx.fillStyle = 'rgba(200,70,60,0.85)';
+      ctx.beginPath(); ctx.moveTo(-r, -r * 0.4); ctx.lineTo(r * 0.3, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r * 0.8); ctx.closePath(); ctx.fill();
+      return;
+    }
+    ctx.fillStyle = 'rgba(255,236,170,0.75)';
+    ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.55, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,240,200,0.6)';
+    ctx.lineWidth = Math.max(0.5, r * 0.15);
+    ctx.beginPath(); ctx.moveTo(r * 0.8, 0); ctx.lineTo(r * 2.2, -r * 1.1); ctx.moveTo(r * 0.8, 0); ctx.lineTo(r * 2.2, r * 0.9);
+    ctx.moveTo(-r, 0); ctx.lineTo(-r * 1.8, 0); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,90,60,0.9)'; ctx.beginPath(); ctx.arc(r * 0.5, 0, Math.max(0.5, r * 0.18), 0, Math.PI * 2); ctx.fill();
   }
 
   function drawEntity(e, t) {
@@ -608,23 +389,18 @@
     ctx.scale(f, 1);
     ctx.rotate(clamp((e.vy || 0) / 500, -0.3, 0.3) * f);
     var shape = d.shape;
+    // v0.13: swim effort from the fish's speed against its usual speed; the phase advances in the update (swimPhase).
+    var spd = Math.hypot(e.vx || 0, e.vy || 0), sw = clamp(spd / Math.max(40, d.speed || 80), 0.15, 1.5);
+    if (shape !== 'plankton' && window.FishArt && FishArt.draw(ctx, d, len, { t: t, ph: e.ph || t * 1.5, sw: sw, lw: lw, px: len * cam.scale })) { ctx.restore(); return; }
     if (shape === 'plankton') planktonDraw(len, d);
-    else if (shape === 'eel') eelFish(len, d, t, lw);
-    else if (shape === 'lure') lureFish(len, d, t, lw);
-    else if (shape === 'lantern') lanternFish(len, d, t, lw);
-    else if (shape === 'oar') oarFish(len, d, t, lw);
-    else if (shape === 'jelly') jellyFish(len, d, t, lw);
-    else if (shape === 'turtle') turtleShape(len, d, t, lw);
     else if (shape === 'crab') crabShape(len, d, t, lw);
     else if (shape === 'trash') trashShape(len, d, t, lw);
     else if (shape === 'clam') clamShape(len, d, t, lw);
     else if (shape === 'rock') rockShape(len, d, lw);
     else if (shape === 'boat') boatShape(len, d, t, lw);
     else if (shape === 'sub') subShape(len, d, t, lw);
-    else if (shape === 'squid') squidShape(len, d, t, lw);
     else if (shape === 'urchin') urchinShape(len, d, t, lw);
     else if (shape === 'shrimp') shrimpShape(len, d, t, lw);
-    else genericFish(len, d.hr || 0.5, d, t, lw);
     ctx.restore();
   }
 
@@ -691,6 +467,7 @@
     r.anemones = makeAnemones(r.info);
     r.birds = makeBirds(r.info);
     r.flora = makeFlora(r.info);
+    r.reef = makeReef(r.info);
     syncForest();
     r.vx = 0;
     r.vy = 0;
@@ -933,9 +710,15 @@
     floatText(meal.x, meal.y, '+' + gain.toFixed(1));
   }
 
+  // v0.13: advance a fish's tail-beat phase (drawn by FishArt): faster when it swims hard, slower when it is big.
+  function swimPhase(o, dt, sp) {
+    o.ph = (o.ph || Math.random()) + dt * (window.FishArt ? FishArt.beat(Math.hypot(o.vx, o.vy), lenFor(o.size, sp.shape)) : 2);
+  }
+
   function updatePodMember(n, dt) {
     var r = run, sp = n.sp;
     n.t += dt;
+    swimPhase(n, dt, sp);
     n.biteT = Math.max(0, n.biteT - dt);
     if (n.morph) {   // v0.12: the school changes form over a few seconds (the old and new looks cross-fade, see drawEntity)
       n.morph.t += dt;
@@ -1323,6 +1106,7 @@
     r.hidden = !!r.air || (r.anemones || []).some(function (a) { return distXY(a.x, a.y, r.x, r.y) < ANEMONE_R; });
     if (Math.abs(r.vx) > 6) r.facing = r.vx > 0 ? 1 : -1;
     if (r.inv > 0) r.inv -= dt;
+    swimPhase(r, dt, r.form);
   }
 
   // ---------- NPC behaviour ----------
@@ -1477,6 +1261,7 @@
     n.y = clamp(n.y + n.vy * dt, 20, bedY(n.x) - 10);
     if (sp.bed) n.y = bedY(n.x) - 12;   // v0.11: crabs walk the seabed
     if (sp.surf) n.y = surfY(n.x) - 26;   // v0.12: boats float on the surface
+    swimPhase(n, dt, sp);
     if (!sp.bed && !sp.surf) tideNudge(n, dt, 1);   // v0.12: the tide drags every fish
     if (Math.abs(n.vx) > 3) n.facing = n.vx > 0 ? 1 : -1;
   }
@@ -1761,80 +1546,216 @@
 
   // The sea surface and the sky above it: a wavy line that tiles with the sea.
   function drawSurface() {
-    var halfW = CW / 2 / cam.scale + 60, x0 = cam.x - halfW, x1 = cam.x + halfW, x;
-    ctx.fillStyle = 'rgba(232,247,255,0.92)';
+    var halfW = CW / 2 / cam.scale + 60, x0 = cam.x - halfW, x1 = cam.x + halfW, x, top = cam.y - CH / 2 / cam.scale;
+    if (top > 260) return;   // v0.13: the surface is out of view
+    // v0.13: under the surface the light is brightest (a glowing band that ripples), the sky above is pale blue.
+    var lg = ctx.createLinearGradient(0, 0, 0, 220);
+    lg.addColorStop(0, 'rgba(255,255,255,0.38)'); lg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = lg; ctx.fillRect(x0, -20, x1 - x0, 240);
+    var sky = ctx.createLinearGradient(0, -700, 0, 0);
+    sky.addColorStop(0, '#9fd2f2'); sky.addColorStop(1, '#e6f6ff');
+    ctx.fillStyle = sky;
     ctx.beginPath();
     ctx.moveTo(x0, -4000);
     for (x = x0; x <= x1; x += 12) ctx.lineTo(x, surfY(x));
     ctx.lineTo(x1, -4000);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
     ctx.lineWidth = 3 / cam.scale;
     ctx.beginPath();
     for (x = x0; x <= x1; x += 12) { if (x === x0) ctx.moveTo(x, surfY(x)); else ctx.lineTo(x, surfY(x)); }
     ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';   // a second, broken highlight just under it: the underside of the waves
+    ctx.lineWidth = 2 / cam.scale;
+    ctx.beginPath();
+    var T = run.t || 0;
+    for (x = x0; x <= x1; x += 12) { var y = surfY(x) + 10 + 5 * Math.sin(x / 37 + T * 2); if (Math.sin(x / 90 + T) > 0) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+    ctx.stroke();
   }
 
   // The seabed: a bumpy line of hills, sand below it. It tiles with the sea.
-  function drawSeabed(zone) {
-    var halfW = CW / 2 / cam.scale + 60, x0 = cam.x - halfW, x1 = cam.x + halfW, x;
-    ctx.fillStyle = zone.sand;
+  function drawSeabed(zone, t) {
+    var halfW = CW / 2 / cam.scale + 60, x0 = cam.x - halfW, x1 = cam.x + halfW, x, H = run.info.H;
+    if (cam.y + CH / 2 / cam.scale < H - 420) return;   // v0.13: the seabed is out of view
+    // v0.13: a far ridge behind the seabed, hazy with the water's colour, moving slower than you (depth).
+    ctx.fillStyle = hexMix(zone.sand, zone.bottom, 0.72);
+    ctx.beginPath(); ctx.moveTo(x0, H + 4000);
+    for (x = x0; x <= x1 + 24; x += 24) { var fx = x * 0.6 + cam.x * 0.4; ctx.lineTo(x, H - 300 + 70 * Math.sin(fx / 410) + 35 * Math.sin(fx / 157 + 1)); }
+    ctx.lineTo(x1 + 24, H + 4000); ctx.closePath(); ctx.fill();
+    // the seabed: sand lit from above, darker below
+    var g = ctx.createLinearGradient(0, H - 200, 0, H + 60);
+    g.addColorStop(0, hexMix(zone.sand, '#ffffff', 0.12)); g.addColorStop(1, hexMix(zone.sand, '#000000', 0.35));
+    ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(x0, run.info.H + 4000);
+    ctx.moveTo(x0, H + 4000);
     for (x = x0; x <= x1; x += 12) ctx.lineTo(x, bedY(x));
-    ctx.lineTo(x1, run.info.H + 4000);
+    ctx.lineTo(x1, H + 4000);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = 'rgba(45,58,74,0.35)';
-    ctx.lineWidth = 3 / cam.scale;
+    // sand ripples and pebbles, fixed to the world
+    var k = 1 / cam.scale, step = 46, i;
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 2 * k; ctx.beginPath();
+    for (i = Math.floor(x0 / step); i * step < x1; i++) {
+      var rx = i * step, ry = bedY(rx) + 14 + 22 * ((i * 7919) % 5) / 5;
+      ctx.moveTo(rx - 16, ry); ctx.quadraticCurveTo(rx, ry - 6, rx + 16, ry);
+    }
+    ctx.stroke();
+    ctx.fillStyle = hexMix(zone.sand, '#000000', 0.3);
+    for (i = Math.floor(x0 / 73); i * 73 < x1; i++) {
+      var pxx = i * 73 + 30 * Math.sin(i * 3.1), pyy = bedY(pxx) + 6 + 10 * Math.abs(Math.sin(i * 1.3));
+      ctx.beginPath(); ctx.ellipse(pxx, pyy, 4 + 4 * Math.abs(Math.sin(i * 2.7)), 3, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    // ripples of sunlight on the sand (caustics), in the lit zones
+    if (zone.light > 0.3) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = 'rgba(255,255,230,' + (0.12 * zone.light).toFixed(3) + ')'; ctx.lineWidth = 3 * k; ctx.beginPath();
+      for (i = Math.floor(x0 / 60); i * 60 < x1; i++) {
+        var cx = i * 60, cy = bedY(cx) + 4, ph = t * 1.4 + i * 0.9;
+        ctx.moveTo(cx - 20, cy + 6 * Math.sin(ph)); ctx.quadraticCurveTo(cx, cy - 10 + 8 * Math.sin(ph * 1.3), cx + 22, cy + 6 * Math.cos(ph));
+      }
+      ctx.stroke(); ctx.restore();
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+    ctx.lineWidth = 2 / cam.scale;
     ctx.beginPath();
     for (x = x0; x <= x1; x += 12) { if (x === x0) ctx.moveTo(x, bedY(x)); else ctx.lineTo(x, bedY(x)); }
     ctx.stroke();
   }
 
-  // Kelp: swaying stalks rising from the seabed.
+  // Kelp and sea grass, swaying. v0.13: by zone. Sea grass in the shallows and on the reef (thin green blades), giant
+  // kelp in open water (golden-brown stalks with leaf blades and gas floats); forests are kelp in every lit zone.
+  // In the dark zones, where nothing grows, the patches are drawn as pale sea pens and glass sponges instead.
   function drawFlora(t) {
-    var halfW = CW / 2 / cam.scale + 300;
+    var halfW = CW / 2 / cam.scale + 300, z = run.info.zone, k = 1 / cam.scale;
+    if (cam.y + CH / 2 / cam.scale < run.info.H - 700) return;
+    ctx.lineCap = 'round';
     (run.flora || []).forEach(function (f) {
       var px = viewX(f.x);
       if (px < cam.x - halfW || px > cam.x + halfW) return;
-      var base = bedY(f.x), i;
+      var base = bedY(f.x), i, j, kind = f.forest && z.kelp !== 'none' ? 'kelp' : z.kelp;
       for (i = 0; i < f.n; i++) {
-        var off = (i - (f.n - 1) / 2) * 12, sway = Math.sin(t * 1.3 + f.seed + i * 0.5) * 14;
+        var off = (i - (f.n - 1) / 2) * 12, sway = Math.sin(t * 1.1 + f.seed + i * 0.5) * 16;
         var hgt = f.h * (0.75 + 0.25 * (((i * 37) % 5) / 4));
-        ctx.strokeStyle = i % 2 ? '#2f8f5b' : '#3fa36b';
-        ctx.lineWidth = 7 / cam.scale;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(px + off, base + 6);
-        ctx.quadraticCurveTo(px + off + sway * 0.3, base - hgt * 0.5, px + off + sway, base - hgt);
+        var tx = px + off + sway, ty = base - hgt, mx = px + off + sway * 0.3, my = base - hgt * 0.5;
+        if (kind === 'grass') {
+          ctx.strokeStyle = i % 2 ? '#3f8a3a' : '#5aa04a'; ctx.lineWidth = 4 * k;
+          ctx.beginPath(); ctx.moveTo(px + off, base + 6); ctx.quadraticCurveTo(mx, my, tx, ty); ctx.stroke();
+        } else if (kind === 'kelp') {
+          ctx.strokeStyle = '#6a5a1e'; ctx.lineWidth = 3.5 * k;
+          ctx.beginPath(); ctx.moveTo(px + off, base + 6); ctx.quadraticCurveTo(mx, my, tx, ty); ctx.stroke();
+          ctx.fillStyle = i % 2 ? '#8a7a2a' : '#a08a32';
+          for (j = 1; j <= 6; j++) {   // leaf blades along the stalk, and a float at the base of each
+            var u = j / 7, bx = (1 - u) * (1 - u) * (px + off) + 2 * u * (1 - u) * mx + u * u * tx, by = (1 - u) * (1 - u) * base + 2 * u * (1 - u) * my + u * u * ty;
+            var side = j % 2 ? 1 : -1;
+            ctx.beginPath(); ctx.ellipse(bx + side * 9, by, 11, 4, side * 0.6 + Math.sin(t * 1.5 + j) * 0.2, 0, Math.PI * 2); ctx.fill();
+          }
+        } else {   // twilight and trench: pale sea pens with feathery tops
+          ctx.strokeStyle = 'rgba(220,200,230,0.55)'; ctx.lineWidth = 2.5 * k;
+          ctx.beginPath(); ctx.moveTo(px + off, base + 6); ctx.lineTo(px + off + sway * 0.2, base - hgt * 0.45); ctx.stroke();
+          ctx.fillStyle = 'rgba(240,210,240,0.45)';
+          ctx.beginPath(); ctx.ellipse(px + off + sway * 0.2, base - hgt * 0.5, 6, 14, sway * 0.01, 0, Math.PI * 2); ctx.fill();
+          if (z === D.ZONES[4] && i % 3 === 0) {   // a faint glow in the trench
+            ctx.fillStyle = 'rgba(120,230,255,0.25)'; ctx.beginPath(); ctx.arc(px + off + sway * 0.2, base - hgt * 0.55, 10, 0, Math.PI * 2); ctx.fill();
+          }
+        }
+      }
+    });
+    drawReef(t);
+  }
+
+  // v0.13: things on the seabed, by zone: rocks and starfish in the shallows; brain coral, staghorn, sea fans, table
+  // coral and tube sponges on the reef; rocks and fans in open water; glass sponges in the twilight; tube worms and
+  // rocks in the trench. Scenery only: the list is made once per level (makeReef) and never touches the game.
+  function makeReef(info) {
+    var count = Math.round(info.W / 150), list = [], i;
+    for (i = 0; i < count; i++) list.push({ x: rand(0, info.W), s: rand(0.7, 1.4), r: Math.random(), seed: Math.random() * 10 });
+    return list;
+  }
+  var CORAL = ['#e8735a', '#f2a65a', '#c86a9a', '#9a6ad8', '#e8c85a', '#5ac8b8'];
+  function drawReef(t) {
+    var z = run.info.zone, halfW = CW / 2 / cam.scale + 200, k = 1 / cam.scale;
+    (run.reef || []).forEach(function (o) {
+      var x = viewX(o.x);
+      if (x < cam.x - halfW || x > cam.x + halfW) return;
+      var y = bedY(o.x) + 4, s = o.s, i, c = CORAL[Math.floor(o.r * 6)];
+      var kind = z.reef === 'coral' ? ['brain', 'stag', 'fan', 'table', 'tube', 'brain'][Math.floor(o.seed * 0.6)] :
+        z.reef === 'shallow' ? ['rock', 'star', 'rock', 'shell'][Math.floor(o.seed * 0.4)] :
+        z.reef === 'open' ? ['rock', 'fan', 'rock'][Math.floor(o.seed * 0.3)] :
+        z.reef === 'twilight' ? ['glass', 'rock', 'glass'][Math.floor(o.seed * 0.3)] : ['worms', 'rock', 'worms', 'rock'][Math.floor(o.seed * 0.4)];
+      ctx.lineWidth = 2 * k; ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      if (kind === 'rock') {
+        ctx.fillStyle = hexMix(z.sand, '#3a3a3a', 0.45 + o.r * 0.2);
+        ctx.beginPath(); ctx.moveTo(x - 40 * s, y + 6); ctx.quadraticCurveTo(x - 36 * s, y - 30 * s, x - 5 * s, y - 34 * s);
+        ctx.quadraticCurveTo(x + 34 * s, y - 28 * s, x + 42 * s, y + 6); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.ellipse(x - 10 * s, y - 24 * s, 16 * s, 6 * s, -0.2, 0, Math.PI * 2); ctx.fill();
+      } else if (kind === 'star') {
+        ctx.fillStyle = '#e86a3a'; ctx.beginPath();
+        for (i = 0; i < 10; i++) { var a = i * Math.PI / 5 - Math.PI / 2, rr = (i % 2 ? 4 : 11) * s; ctx.lineTo(x + Math.cos(a) * rr, y - 5 + Math.sin(a) * rr * 0.5); }
+        ctx.closePath(); ctx.fill();
+      } else if (kind === 'shell') {
+        ctx.fillStyle = '#f2e2c8'; ctx.beginPath(); ctx.ellipse(x, y - 3, 9 * s, 6 * s, 0, Math.PI, 0); ctx.fill(); ctx.stroke();
+      } else if (kind === 'brain') {
+        ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x, y, 34 * s, 26 * s, 0, Math.PI, 0); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.beginPath();
+        for (i = 0; i < 4; i++) { ctx.moveTo(x - 28 * s, y - (5 + i * 5) * s); ctx.bezierCurveTo(x - 10 * s, y - (12 + i * 5) * s, x + 10 * s, y - i * 5 * s, x + 28 * s, y - (6 + i * 5) * s); }
         ctx.stroke();
+      } else if (kind === 'stag') {   // staghorn: branching antlers
+        ctx.strokeStyle = c; ctx.lineWidth = 6 * s * k + 2;
+        var branch = function (bx, by, ang, len, d) {
+          var ex = bx + Math.cos(ang) * len, ey = by + Math.sin(ang) * len;
+          ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(ex, ey); ctx.stroke();
+          if (d > 0) { branch(ex, ey, ang - 0.45, len * 0.7, d - 1); branch(ex, ey, ang + 0.4, len * 0.7, d - 1); }
+        };
+        branch(x, y, -Math.PI / 2 - 0.2, 26 * s, 2); branch(x + 10 * s, y, -Math.PI / 2 + 0.35, 22 * s, 2);
+      } else if (kind === 'fan') {    // a sea fan: a flat net of fine branches that sways
+        var sw = Math.sin(t * 0.8 + o.seed) * 0.05;
+        ctx.strokeStyle = z.reef === 'coral' ? c : '#c8705a'; ctx.lineWidth = 1.5 * k;
+        ctx.beginPath();
+        for (i = 0; i < 9; i++) { var fa = -Math.PI / 2 + (i - 4) * 0.17 + sw; ctx.moveTo(x, y); ctx.quadraticCurveTo(x + Math.cos(fa) * 30 * s, y + Math.sin(fa) * 30 * s, x + Math.cos(fa) * 58 * s, y + Math.sin(fa) * 58 * s); }
+        for (i = 1; i <= 4; i++) { ctx.moveTo(x - 13 * i * s * 0.75, y - 13 * i * s); ctx.quadraticCurveTo(x, y - 15 * i * s, x + 13 * i * s * 0.75, y - 13 * i * s); }
+        ctx.stroke();
+      } else if (kind === 'table') {
+        ctx.fillStyle = c; ctx.fillRect(x - 3 * s, y - 24 * s, 6 * s, 24 * s);
+        ctx.beginPath(); ctx.ellipse(x, y - 26 * s, 40 * s, 7 * s, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      } else if (kind === 'tube') {   // tube sponges: a cluster of open pipes
+        for (i = 0; i < 3; i++) {
+          var tx2 = x + (i - 1) * 12 * s, th = (28 + 14 * ((i + o.r * 3) % 2)) * s;
+          ctx.fillStyle = i % 2 ? '#c86a3a' : '#e08a4a'; ctx.fillRect(tx2 - 5 * s, y - th, 10 * s, th);
+          ctx.fillStyle = '#5a2a1a'; ctx.beginPath(); ctx.ellipse(tx2, y - th, 5 * s, 2 * s, 0, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (kind === 'glass') {  // a glass sponge: a pale lattice vase
+        ctx.strokeStyle = 'rgba(230,240,255,0.55)'; ctx.lineWidth = 1.5 * k; ctx.beginPath();
+        ctx.moveTo(x - 6 * s, y); ctx.quadraticCurveTo(x - 16 * s, y - 30 * s, x - 10 * s, y - 60 * s); ctx.lineTo(x + 10 * s, y - 60 * s); ctx.quadraticCurveTo(x + 16 * s, y - 30 * s, x + 6 * s, y);
+        for (i = 1; i < 6; i++) { ctx.moveTo(x - 12 * s, y - i * 10 * s); ctx.lineTo(x + 12 * s, y - i * 10 * s); }
+        ctx.stroke();
+      } else if (kind === 'worms') {  // giant tube worms: white tubes with red plumes, by a vent
+        for (i = 0; i < 4; i++) {
+          var wx = x + (i - 1.5) * 8 * s, wh = (30 + 12 * Math.sin(i * 2 + o.seed)) * s;
+          ctx.strokeStyle = '#e8e2d8'; ctx.lineWidth = 4 * s * k + 1.5; ctx.beginPath(); ctx.moveTo(wx, y); ctx.lineTo(wx + Math.sin(i) * 3, y - wh); ctx.stroke();
+          ctx.fillStyle = '#d8302a'; ctx.beginPath(); ctx.ellipse(wx + Math.sin(i) * 3, y - wh - 4 * s, 4 * s, 7 * s, Math.sin(t + i) * 0.2, 0, Math.PI * 2); ctx.fill();
+        }
       }
     });
   }
 
-  // A sea anemone: a pink mound with tentacles that wave (a safe spot, see ANEMONE_R).
+  // A sea anemone: a stout column with a crown of tentacles that wave (a safe spot, see ANEMONE_R).
+  // v0.13: drawn like a real magnificent sea anemone: a red-brown column, many pink-violet tentacles with pale tips.
   function drawAnemone(x, y, t) {
     var k = 1 / cam.scale, i;
     ctx.save();
     ctx.lineCap = 'round';
-    for (i = 0; i < 7; i++) {
-      var bx = x + (i - 3) * 9, sway = Math.sin(t * 1.6 + i) * 10 * k;
-      ctx.strokeStyle = i % 2 ? '#f48fb1' : '#ff9ec4';
-      ctx.lineWidth = 6 * k;
-      ctx.beginPath();
-      ctx.moveTo(bx, y + 22);
-      ctx.quadraticCurveTo(bx + sway * 0.6, y - 10, bx + sway, y - 34 - (i % 3) * 6 * k);
-      ctx.stroke();
+    var col = ctx.createLinearGradient(0, y + 30, 0, y);
+    col.addColorStop(0, '#7a2a3a'); col.addColorStop(1, '#b84a5a');
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.moveTo(x - 30, y + 30); ctx.quadraticCurveTo(x - 36, y + 10, x - 42, y + 2); ctx.lineTo(x + 42, y + 2); ctx.quadraticCurveTo(x + 36, y + 10, x + 30, y + 30); ctx.closePath(); ctx.fill();
+    for (i = 0; i < 16; i++) {
+      var bx = x + (i - 7.5) * 5.4, sway = Math.sin(t * 1.4 + i * 0.6) * 9, h = 30 + 12 * Math.sin(i * 1.7);
+      ctx.strokeStyle = i % 2 ? '#e86aa8' : '#f28ac0';
+      ctx.lineWidth = 5 * k + 1.5;
+      ctx.beginPath(); ctx.moveTo(bx, y + 4); ctx.quadraticCurveTo(bx + sway * 0.5 + (i - 7.5) * 1.5, y - h * 0.5, bx + sway + (i - 7.5) * 2.5, y - h); ctx.stroke();
+      ctx.fillStyle = '#ffd8ec'; ctx.beginPath(); ctx.arc(bx + sway + (i - 7.5) * 2.5, y - h, 2.6 * k + 1, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.fillStyle = '#e3a0b8';
-    ctx.strokeStyle = OUT;
-    ctx.lineWidth = 2.5 * k;
-    ctx.beginPath();
-    ctx.ellipse(x, y + 26, 46, 16, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
     ctx.restore();
   }
 
@@ -1889,8 +1810,9 @@
     ctx.scale(cam.scale, cam.scale);
     ctx.translate(-cam.x, -cam.y);
 
+    drawRays(run.info.zone, t);
     drawSurface();
-    drawSeabed(run.info.zone);
+    drawSeabed(run.info.zone, t);
     drawFlora(t);
     (run.anemones || []).forEach(function (a) { drawAnemone(viewX(a.x), a.y, t); });
     drawBirds();
@@ -1898,7 +1820,7 @@
     var list = run.npcs.slice();
     var playerVisible = !(run.inv > 0 && Math.floor(t * 10) % 2 === 0);
     if (playerVisible) {
-      list.push({ x: run.x, y: run.y, vy: run.vy, facing: run.facing, size: run.size, desc: playerDesc(), isPlayer: true, hp: run.hp, maxHp: run.maxHp });
+      list.push({ x: run.x, y: run.y, vx: run.vx, vy: run.vy, ph: run.ph, facing: run.facing, size: run.size, desc: playerDesc(), isPlayer: true, hp: run.hp, maxHp: run.maxHp });
     }
     // v0.12: only what is on screen (plus its own length) is drawn. The sea has hundreds of fish, most of them off screen.
     var hw = CW / 2 / cam.scale + 60, hh = CH / 2 / cam.scale + 60;
@@ -1986,6 +1908,7 @@
       }
     });
     ctx.restore();
+    drawVignette(z);   // v0.13
   }
 
   // v0.12 tide: white streaks that churn, then stream with the pull, across the view.
@@ -2145,6 +2068,7 @@
     run.anemones = makeAnemones(run.info);
     run.birds = makeBirds(run.info);
     run.flora = makeFlora(run.info);
+    run.reef = makeReef(run.info);
     cam.x = run.x;
     cam.y = run.y;
     mode = 'play';

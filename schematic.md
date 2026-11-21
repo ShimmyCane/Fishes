@@ -33,6 +33,20 @@ A game inside a fish tank that becomes the ocean. You start as a baby fish eatin
 - **Harmless** fish (sunfish, oarfish, megamouth, whale shark) drift. You can eat them when you are big enough.
 - **Tension:** 0 until 2:30, rising to full at 5:00. Hunters and ambushers become more numerous, and locks are more likely.
 
+## Balance and looks (2026-11-21)
+
+These replace the older numbers below where they differ. Every knob is in `TUNING` in `js/species.js`.
+
+- **A fish meal** gives a quarter of the fish's size, but at least 1/5 of the level's span and at most 1/3 of it (levels 8-10: at least 1/7; level 20: 1/6). A level takes 3 to 5 fish meals, about half a minute.
+- **Level goals:** levels 1-4 need three times the base growth (the plankton levels); levels 5-20 need 0.915 of it, so the final goal is still 300.
+- **Wild fish** are 3x their listed size (`fishScale`), the same scale as your size and the goals. New fish are sized into the band of their role: edible ones between the eating floor and 0.86x you, predators 1.15-1.9x you.
+- **Bites:** your bite does 2x your attack (`playerBite`). Fish from level 10 no longer have double health (`lateHp` 1). A fish under half your size does not bite you (`nibbleMin`).
+- **Your health** is 2.6 x (10 + size / 2), times your form's health. After 4 seconds without a hit you heal 8% of it a second (at least 3).
+- **Difficulty** adds predators on top of Medium's food: the sea holds as many edible fish on Hard as on Medium, plus the extra predators.
+- **Off-screen fish too small to eat** swim off a few at a time, so new fish your size come in.
+- **Measured** with `node tools/balance.js` (bot games, 4 per cell): Medium 10/12 reach level 20 in 11-15 minutes, about 1 life lost; Hard usually ends at the 15-minute cap around level 15-16; Easy ends at 5:00 around level 10-11.
+- **Looks:** `js/fishart.js` draws every fish from its body plan (reef fish, tuna, shark, billfish, eel, flatfish, sunfish, ray, puffer, angler), with species markings and a swimming motion. It never changes the rules. `tools/gallery.html` shows them all.
+
 ## Tiers, evolution and the food chain
 
 Twenty tiers (one per level), in five depth zones. The play area starts at 3198 × 2000. Its width grows with each tier as the camera needs (about 40,264 at tier 20); its height stays 2000 on every tier (v0.12), and the camera zooms out instead. On screen, a fish grows 25% from tier 1 to tier 20, interpolated by tier; the camera zooms out to hold that, and never shows more than 90% of the sea's width. A big fish is drawn shorter than before (its length grows with the square root of its size past 20), so the largest fish fits the fixed height.
@@ -124,6 +138,8 @@ From 2:30 the predator share rises by up to 50% (capped at 70%) as the game gets
 - `index.html`: the page (title, HUD, sprint, ⚙️ panel, end card, error strip).
 - `css/style.css`: pastel look, bold outlines, offset shadows, big targets.
 - `js/species.js`: 20 tiers and their species (`SPECIES` with `tier`, `temper`), zones, `GOALS`, `DIFFICULTY`, `leadOf()`, config (lives, time limit, tension, database keys).
+- `js/fishart.js`: how every fish looks (body plans, fins, markings, swim motion). Drawing only.
+- `tools/balance.js`: plays whole games headless with a bot and reports pacing and deaths. `tools/gallery.html`: every species as drawn.
 - `js/game.js`: simulation (player, AI, eating, lock-on, levels), drawing and input. Test hook: `window.FishGame` (`state()`, `debugSetSize()`).
 - `js/notes.js`: notes. Saved to a cookie (last 25 notes), then to the family database when signed in.
 - `js/family.js`: family sign-in (`FishFamily`): the shared Family project, same account as Expansion Wars.
