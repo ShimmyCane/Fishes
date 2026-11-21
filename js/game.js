@@ -7,6 +7,7 @@
   var D = window.FishData;
   var SPECIES = D.SPECIES;
   var CFG = D.CONFIG;
+  var TUNE = D.TUNING;   // v0.13: balance knobs (species.js); tools/balance.js measures them
   var OUT = '#2d3a4a';
 
   var $ = function (id) { return document.getElementById(id); };
@@ -19,6 +20,8 @@
   var paused = false;
   var cam = { x: 0, y: 0, scale: 1 };
   var keys = {};
+  // v0.13 headless simulation (tools/balance.js): the page's own loop stands still and a bot steers through debugStep.
+  var sim = { on: false, dx: 0, dy: 0, sprint: false };
   var control = 'tap';                       // 'tap' (finger/mouse moves you) or 'joystick' (bottom-left stick)
   var joy = { id: null, cx: 0, cy: 0, dx: 0, dy: 0 };
   var ptr = { down: false, x: 0, y: 0 };
@@ -676,6 +679,7 @@
     var offY = r.npcs.map(function (o) { return o.y - r.y; });   // v0.11: keep the height too, so allies stay with you
     r.info = D.levelInfo(n);
     r.level = n;
+    if (r.stats) r.stats.levelAt[n - 1] = Math.round(r.t * 10) / 10;
     r.goal = r.info.goal;
     r.x = r.info.W / 2;
     r.y = r.info.H / 2;
@@ -745,7 +749,7 @@
   // A bite takes off the attacker's attack value. Small fish have 1 health, so one bite is enough;
   // bigger fish take several bites, with a pause between bites (player 0.6 s, fish 0.9 s).
   // The player's bite timer is at least one second (v0.8), and eating chum or plankton also starts it.
-  var BITE_S = 1.0, STRIKE_S = 0.9;
+  var BITE_S = TUNE.biteS, STRIKE_S = TUNE.strikeS;
   // Hit points are doubled (v0.8). Fish of size 4 or more take several bites (4 to 10); smaller fish go in two or more.
   // From level 10 on, fish have twice the hit points again (v0.9): several bites to take down a prey.
   function maxHpOf(size) {
@@ -753,7 +757,7 @@
     return late * 2 * (size >= 4 ? Math.max(2, Math.round(size / 2)) : Math.max(1, Math.round(size / 3)));
   }
   function atkOf(size) { return 1 + Math.floor(size / 8); }
-  function playerMaxHp(size) { return 2 * (10 + Math.floor(size / 2)); }
+  function playerMaxHp(size) { return TUNE.playerHp * (10 + Math.floor(size / 2)); }
   var CHUM = { id: 'chum', name: 'Chum', kind: 'food', temper: 'docile', shape: 'plankton', size: 0.6, speed: 20, col: '#ffb4a2' };
 
   // A fish of size 4 or more leaves chum behind when it dies. Chum draws small fish in to feed and school.
@@ -912,9 +916,7 @@
   // Growth is checked after the NPC update, not here, so a level change cannot happen mid-loop.
   var ALLY_SHARE = 0.5;
   function allyCredit(meal) {
-    var r = run, span = Math.max(0.5, r.info.meal), gain;
-    gain = meal.sp.kind === 'food' ? meal.size * 0.4 : Math.max(meal.size * 0.25, span / mealDiv(r.info.n));
-    gain *= ALLY_SHARE;
+    var r = run, gain = mealGain(meal) * ALLY_SHARE;
     r.size += gain;
     r.growPending = true;
     floatText(meal.x, meal.y, '+' + gain.toFixed(1));
@@ -988,6 +990,7 @@
       var o = r.npcs[i];
       if (o === victim || o === attacker || o.dead || o.sp !== victim.sp || o.biteT > 0) continue;
       if (distW(o, victim) > 220 || distXY(o.x, o.y, ax, ay) > 260) continue;
+      if (isPlayer && o.size < r.size * TUNE.nibbleMin) continue;   // v0.13: too small to take you on
       o.biteT = STRIKE_S;
       var dmg = atkOf(o.size);
       if (isPlayer) { hurt(o, dmg); continue; }
@@ -999,14 +1002,17 @@
 
   // v0.12 spatial grid: each frame the fish are sorted into 300-unit cells, so a search looks at the cells near it
   // instead of every fish (the all-pairs search was most of the frame time). The grid is a little stale while fish
-  // move within a frame, so searches reach one cell further than their radius.
-  var GRID = 300;
+  // move within a frame (well under GRID_SLACK units), so searches reach that much further than their radius.
+  // v0.13: the slack was a whole extra cell each way (7 x 7 cells for a 300 search); it is now 40 units (3 x 3 cells),
+  // which made the update about three times faster at level 1 (measured with tools/balance.js).
+  var GRID = 300, GRID_SLACK = 40;
   function buildGrid() {
-    var r = run, cols = Math.ceil(r.info.W / GRID), rows = Math.ceil(r.info.H / GRID), g = {}, i, o, k;
+    // v0.13: cells are a flat array indexed by number (string keys made garbage on every search).
+    var r = run, cols = Math.ceil(r.info.W / GRID), rows = Math.ceil(r.info.H / GRID), g = new Array(cols * rows), i, o, k;
     for (i = 0; i < r.npcs.length; i++) {
       o = r.npcs[i];
       if (o.dead) continue;
-      k = (Math.floor(wrapX(o.x) / GRID) % cols) + ',' + clamp(Math.floor(o.y / GRID), 0, rows - 1);
+      k = (Math.floor(wrapX(o.x) / GRID) % cols) * rows + clamp(Math.floor(o.y / GRID), 0, rows - 1);
       (g[k] = g[k] || []).push(o);
     }
     r.grid = { g: g, cols: cols, rows: rows };
@@ -1015,11 +1021,11 @@
   function eachNear(n, rad, fn) {
     var grid = run.grid, dx, dy, gx, gy, cell, i;
     if (!grid) { for (i = 0; i < run.npcs.length; i++) fn(run.npcs[i]); return; }
-    var cx = Math.floor(wrapX(n.x) / GRID), cy = clamp(Math.floor(n.y / GRID), 0, grid.rows - 1), k = Math.ceil(rad / GRID) + 1;
+    var cx = Math.floor(wrapX(n.x) / GRID), cy = clamp(Math.floor(n.y / GRID), 0, grid.rows - 1), k = Math.ceil((rad + GRID_SLACK) / GRID);
     for (dx = -k; dx <= k; dx++) for (dy = -k; dy <= k; dy++) {
       gx = ((cx + dx) % grid.cols + grid.cols) % grid.cols; gy = cy + dy;
       if (gy < 0 || gy >= grid.rows) continue;
-      cell = grid.g[gx + ',' + gy];
+      cell = grid.g[gx * grid.rows + gy];
       if (cell) for (i = 0; i < cell.length; i++) fn(cell[i]);
     }
   }
@@ -1078,7 +1084,7 @@
   // Share of new fish that are threats: the difficulty ratio, raised by up to 50% as time passes.
   function threatShare() {
     var base = D.DIFFICULTY[run.difficulty].share;
-    return Math.min(0.7, base * (1 + 0.5 * run.tension));
+    return Math.min(TUNE.threatCap, base * (1 + TUNE.tensionBoost * run.tension));
   }
 
   // Pick a species for a role. Predators come from 1–3 tiers above you, prey from 0–3 tiers below.
@@ -1175,7 +1181,7 @@
     });
     // Fish: a tier-sized population, split into threats and edible fish by the ratio.
     var c = census();
-    var need = Math.round((22 + 3 * n) * dense) - c.fish;
+    var need = Math.round((TUNE.fishBase + TUNE.fishPerLevel * n) * dense) - c.fish;
     var budget = initial ? 999 : 2 * dense;
     while (need > 0 && budget > 0) {
       var role = pickRole(c), actual = role;
@@ -1209,7 +1215,7 @@
 
   // ---------- player ----------
   // v0.12: your base speed no longer falls as you grow. It rises 3% a level (see updatePlayer), so level 15 to 20 is faster.
-  function speedFor() { return 200 * 1.15; }
+  function speedFor() { return TUNE.playerSpeed; }
 
   function toWorld(sx, sy) {
     return { x: cam.x + (sx - CW / 2) / cam.scale, y: cam.y + (sy - CH / 2) / cam.scale };
@@ -1221,7 +1227,7 @@
     r.maxHp = Math.round(playerMaxHp(r.size) * (r.form.hp || 1));   // v0.12: your form's health
     r.hp = Math.min(r.hp, r.maxHp);
     r.quietT = (r.quietT || 0) + dt;
-    if (r.quietT > 4 && r.hp < r.maxHp) r.hp = Math.min(r.maxHp, r.hp + 3 * dt);
+    if (r.quietT > 4 && r.hp < r.maxHp) r.hp = Math.min(r.maxHp, r.hp + TUNE.regen * dt);
     if (control === 'joystick' && Math.hypot(joy.dx, joy.dy) > 0.15) {
       dx = joy.dx; dy = joy.dy;
       var jm = Math.hypot(dx, dy);
@@ -1231,6 +1237,7 @@
       var ex = dxW(w.x, r.x), ey = w.y - r.y, dist = Math.hypot(ex, ey);
       if (dist > 14) { dx = ex / dist; dy = ey / dist; }
     }
+    if (sim.on) { dx = sim.dx; dy = sim.dy; }   // v0.13: the balance bot steers
     var kx = (keys.ArrowRight || keys.d || keys.D ? 1 : 0) - (keys.ArrowLeft || keys.a || keys.A ? 1 : 0);
     var ky = (keys.ArrowDown || keys.s || keys.S ? 1 : 0) - (keys.ArrowUp || keys.w || keys.W ? 1 : 0);
     if (kx || ky) {
@@ -1239,7 +1246,7 @@
       dy = ky / kl;
     }
     var moving = dx !== 0 || dy !== 0;
-    var sprint = (sprintHeld || keys.Shift || keys[' ']) && moving && r.stamina > 0;
+    var sprint = (sprintHeld || keys.Shift || keys[' '] || (sim.on && sim.sprint)) && moving && r.stamina > 0;
     if (sprint) {
       r.stamina = Math.max(0, r.stamina - 38 * dt);
       r.sprintCd = 0.8;
@@ -1248,7 +1255,7 @@
       if (r.sprintCd <= 0) r.stamina = Math.min(100, r.stamina + 24 * dt);
     }
     r.sprinting = sprint;
-    var sp = speedFor(r.size) * (1 + 0.03 * (r.info.n - 1)) * (r.form.spd || 1) * (sprint ? 2.1 : 1);   // +3% a level; v0.12: your form's speed
+    var sp = speedFor(r.size) * (1 + 0.03 * (r.info.n - 1)) * (r.form.spd || 1) * (sprint ? TUNE.sprint : 1);   // +3% a level; v0.12: your form's speed
     var k = Math.min(1, dt * 7);
     r.vx += (dx * sp - r.vx) * k;
     if (!r.air) r.vy += (dy * sp - r.vy) * k;
@@ -1291,14 +1298,13 @@
   // Nearest fish this predator can eat (at least 1.25x smaller), within 240 units.
   function findPrey(n) {
     var r = run, best = null, bd = 240 + 12 * r.info.n;   // v0.11: hunters look further on deeper levels
-    for (var i = 0; i < r.npcs.length; i++) {
-      var o = r.npcs[i];
-      if (o === n || o.dead || o.sp.kind === 'food' || o.sp.kind === 'harmless') continue;
-      if (o.size * 1.25 > n.size) continue;
+    eachNear(n, bd, function (o) {   // v0.13: the nearby cells, not the whole sea
+      if (o === n || o.dead || o.sp.kind === 'food' || o.sp.kind === 'harmless') return;
+      if (o.size * 1.25 > n.size) return;
       var d = distW(o, n);
       if (o.hp < o.maxHp) d *= 0.5;   // once a fish is hurt, others go for it
       if (d < bd) { bd = d; best = o; }
-    }
+    });
     return best;
   }
 
@@ -1316,7 +1322,13 @@
 
     if (sp.kind === 'food') {
       // v0.11: plankton and krill scatter from any other fish that swims close (you still catch them on contact).
-      var threatF = findNear(n, 170, function (o) { return o.sp.kind !== 'food' && o.sp.kind !== 'harmless' && !o.pod; });
+      // v0.13: plankton looks round every quarter second, not every frame (it is most of the sea, so this was most of the cost).
+      n.lookT = (n.lookT || 0) - dt;
+      if (n.lookT <= 0 || (n.scare && n.scare.dead)) {
+        n.lookT = 0.25;
+        n.scare = findNear(n, 170, function (o) { return o.sp.kind !== 'food' && o.sp.kind !== 'harmless' && !o.pod; });
+      }
+      var threatF = n.scare;
       if (threatF) {
         var fx2 = dxW(n.x, threatF.x), fy2 = n.y - threatF.y;
         var fl2 = Math.hypot(fx2, fy2) || 1;
@@ -1329,8 +1341,10 @@
       var fx = 0, fy = 0, threat = false, i, pr;
       if (!r.hidden && r.size >= n.size * 1.15 && dp < 320) { threat = true; fx -= dxp / dp; fy -= dyp / dp; }
       var scatter = false;
-      for (i = 0; i < predators.length; i++) {
-        pr = predators[i];
+      var nearPred = [];   // v0.13: only predators in the cells near it (was every predator in the sea)
+      eachNear(n, 420, function (o) { if (!o.dead && (o.sp.kind === 'hunter' || o.sp.kind === 'ambush')) nearPred.push(o); });
+      for (i = 0; i < nearPred.length; i++) {
+        pr = nearPred[i];
         if (pr.size < n.size * 1.15) continue;
         var ddx = dxW(n.x, pr.x), ddy = n.y - pr.y, dd = Math.hypot(ddx, ddy) || 1;
         // A predator 2.5x their size makes prey scatter from further away.
@@ -1343,14 +1357,13 @@
       } else if (findFeed(n)) {
         var fd = findFeed(n); tx = fd.x; ty = fd.y; s = speed * 0.7;
       } else if (sp.school) {
-        var cx = 0, cy = 0, c = 0, j;
-        for (j = 0; j < r.npcs.length; j++) {
-          var o = r.npcs[j];
-          if (o === n || o.sp !== sp || o.dead) continue;
+        var cx = 0, cy = 0, c = 0;
+        eachNear(n, 260, function (o) {   // v0.13: schoolmates from the nearby cells (was a search of the whole sea)
+          if (o === n || o.sp !== sp || o.dead) return;
           var ex = dxW(o.x, n.x), ey = o.y - n.y;
-          if (ex * ex + ey * ey < 260 * 260) { cx += o.x; cy += o.y; c++; }
-        }
-        if (c > 0) { tx = cx / c; ty = cy / c; s = speed * 0.8; }
+          if (ex * ex + ey * ey < 260 * 260) { cx += ex; cy += ey; c++; }
+        });
+        if (c > 0) { tx = n.x + cx / c; ty = n.y + cy / c; s = speed * 0.8; }
       }
       if (tx === null) { var pw = wander(n, 350); tx = pw.x; ty = pw.y; s = speed * 0.5; }
     } else if (sp.kind === 'ambush') {
@@ -1390,7 +1403,7 @@
       if (!n.locked) {
         if (playerBig && dp < 220) {
           tx = n.x - dxp / dp * 400; ty = n.y - dyp / dp * 400; s = speed * 1.2; k = 5;
-        } else if (sp.temper === 'aggressive' && canEat && n.cool <= 0 && dp < sp.sense && Math.random() < (0.4 + 0.6 * r.tension) * dt) {
+        } else if (sp.temper === 'aggressive' && canEat && n.cool <= 0 && dp < sp.sense && Math.random() < (TUNE.lockRate + TUNE.lockTension * r.tension) * dt) {
           n.locked = true;
           n.lockT = 7 + 2 * r.tension;
           shareLock(n);
@@ -1471,14 +1484,13 @@
       floatText(n.x, n.y, 'Spines! -2');
       FishSound.play('hurt');
     } else {
-      // A level takes about nine fish meals at most: each meal gives at least a ninth of the level's size range.
-      var span = Math.max(0.5, r.info.meal);
-      gain = n.sp.kind === 'food' ? n.size * 0.4 : Math.max(n.size * 0.25, span / mealDiv(r.info.n));   // level 20: ten meals (v0.9)
+      gain = mealGain(n);
       r.size += gain;
       floatText(n.x, n.y, '+' + gain.toFixed(1));
       FishSound.play('eat');
     }
     r.eaten++;
+    if (r.stats) { if (n.sp.kind === 'food') r.stats.food++; else r.stats.fish++; }
     burst(n.x, n.y, n.sp.col || '#ffffff', 6);
     dropChum(n);
     if (n.sp === CHUM) {
@@ -1495,12 +1507,14 @@
     r.hitBy = n.sp.name;
     if (r.inv > 0) return;
     r.quietT = 0;
+    if (r.stats) { r.stats.dmg += Math.min(dmg, r.hp); (r.stats.dmgBy[n.sp.name] = (r.stats.dmgBy[n.sp.name] || 0) + dmg); }
     r.hp = Math.max(0, r.hp - dmg);
     burst(r.x, r.y, '#d9473a', 6 + dmg);
     if (r.hp > 0) { floatText(r.x, r.y, '-' + dmg); return; }
     r.lives--;
+    if (r.stats) r.stats.deaths.push({ t: Math.round(r.t), level: r.info.n, by: n.sp.name });
     FishSound.play('hurt');
-    r.size = Math.max(r.info.enterSize, r.size * 0.75);
+    r.size = Math.max(r.info.enterSize, r.size * TUNE.deathShrink);
     r.hp = playerMaxHp(r.size);
     if (r.lives <= 0) { r.lives = 0; endRun('eaten'); return; }
     r.x = r.info.W / 2;
@@ -1520,7 +1534,15 @@
   // v0.12: fish under this share of your size are not food. Half your size up to level 10, then 80%.
   // v0.12 (family note 2026-11-08: levels 8-10 went up too fast, the EXP per fish was too big): a fish is a smaller
   // share of a level from 8 to 10 (a twelfth of the span, not a ninth).
-  function mealDiv(n) { return n >= 20 ? 10 : (n >= 8 && n <= 10) ? 12 : 9; }
+  function mealDiv(n) { return n >= 20 ? TUNE.mealDivTop : (n >= 8 && n <= 10) ? TUNE.mealDivMid : TUNE.mealDiv; }
+  // What a meal grows you by. Plankton, krill and chum: 0.4 of their size. A fish: a quarter of its size, but at least
+  // 1/mealDiv of the level's span (a level takes about nine meals at most) and, v0.13, at most 1/mealMin of it. Without
+  // that cap a big fish at levels 5-10 gave two levels in one bite (measured: levels 6-9 passed in 5 s each).
+  function mealGain(meal) {
+    if (meal.sp.kind === 'food') return meal.size * 0.4;
+    var span = Math.max(0.5, run.info.meal);
+    return clamp(meal.size * 0.25, span / mealDiv(run.info.n), span / TUNE.mealMin);
+  }
   // Levels 1-4 have no floor: there every wild fish is under half your size, so a floor left only plankton to eat.
   function edibleMin() { return run.info.n > 10 ? 0.8 : run.info.n >= 5 ? EDIBLE_MIN : 0; }
   function checkContact(n) {
@@ -1544,7 +1566,9 @@
     if (sp.kind === 'harmless') return;
     // v0.10: a fight with a fish of any size. Each side bites on its own timer, for its attack value.
     // Hidden under an anemone, the fish cannot bite you; you can still bite it.
-    if (canBite(sp) && !r.hidden && n.biteT <= 0) {
+    // v0.13: a fish under half your size (TUNE.nibbleMin) does not bite you, so fish too small for you to bite cannot
+    // wear you down unseen (measured: packs of tuna a third your size took most lives at levels 9-10).
+    if (canBite(sp) && !r.hidden && n.biteT <= 0 && n.size >= r.size * TUNE.nibbleMin) {
       n.biteT = STRIKE_S;
       hurt(n, atkOf(n.size));
       if (mode !== 'play' || run !== r) return;   // you may have lost a life (the fish is then reset)
@@ -1567,6 +1591,7 @@
     var r = run;
     if (!r || mode !== 'play') return;
     mode = 'over';
+    r.endReason = reason;   // v0.13: read by tools/balance.js
     var score = scoreOf(r) + (reason === 'win' ? 500 : 0);
     r.score = score;
     if (score > best) {
@@ -1632,11 +1657,13 @@
     // Each bite takes off the attacker's attack value; a fish is out when its health reaches zero.
     // An ally's kill feeds you (half a meal), and an ally that is killed counts as lost, not eaten.
     buildGrid();   // the fish have moved since the grid was built
+    var maxLen = 0;   // v0.13: the longest fish this frame bounds every contact reach (0.36 x the two lengths)
+    for (i = 0; i < r.npcs.length; i++) if (!r.npcs[i].dead) maxLen = Math.max(maxLen, lenFor(r.npcs[i].size, r.npcs[i].sp.shape));
     for (i = 0; i < r.npcs.length; i++) {
       var eater = r.npcs[i];
       if (eater.dead || eater.biteT > 0 || !canBite(eater.sp)) continue;
       var done = false;   // one meal (or one bite) per fish per frame, as before
-      eachNear(eater, 360, function (meal) {   // reach is at most 0.36 x two fish lengths, under 340 units
+      eachNear(eater, (lenFor(eater.size, eater.sp.shape) + maxLen) * 0.36, function (meal) {   // the furthest any contact can reach
         if (done || meal === eater || meal.dead || meal.sp === eater.sp) return;
         // v0.12: your school never fights itself, nothing bites it during the calm, and harmless creatures are not food.
         if (eater.pod && meal.pod) return;
@@ -2070,7 +2097,8 @@
       npcs: [], parts: [], spawnT: 0, bannerT: 0, lockedCount: 0, score: 0,
       difficulty: getDifficulty(), form: D.leadOf(1), path: [{ n: 1, id: D.leadOf(1).id, name: D.leadOf(1).name, build: 'all-round' }], npcEaten: 0, hitBy: '', goal: D.levelInfo(1).goal, packSeq: 0,
       zoneFrom: null, zoneOld: null, bgT: 1,
-      hp: playerMaxHp(D.START_SIZE), maxHp: playerMaxHp(D.START_SIZE), biteT: 0, quietT: 0, podSpawns: 0
+      hp: playerMaxHp(D.START_SIZE), maxHp: playerMaxHp(D.START_SIZE), biteT: 0, quietT: 0, podSpawns: 0,
+      stats: { dmg: 0, dmgBy: {}, deaths: [], food: 0, fish: 0, levelAt: [0] }   // v0.13: read by tools/balance.js
     };
     run.x = run.info.W / 2;
     run.y = run.info.H / 2;
@@ -2446,7 +2474,8 @@
     var dt = Math.min(0.05, last ? (ts - last) / 1000 : 0);
     last = ts;
     try {
-      if (mode === 'play' && !paused && run) {
+      if (sim.on) { /* v0.13: a headless balance run drives the game through debugStep; the page loop waits */ }
+      else if (mode === 'play' && !paused && run) {
         update(dt);
         if (mode === 'play') updateCamera(dt);
         hudTimer -= dt;
@@ -2454,7 +2483,7 @@
       } else if (run && mode === 'play' && !paused) {
         updateCamera(dt);
       }
-      render(secs);
+      if (!sim.on) render(secs);
     } catch (err) {
       reportError(err && err.message ? err.message : 'Game loop error');
     }
@@ -2469,6 +2498,40 @@
   var testFish = null, testCreature = null;
   window.FishGame = {
     resize: resize,
+    // v0.13 balance hooks (tools/balance.js). debugSim(true) stops the page loop; debugStep advances the game by
+    // steps x dt with the steering from debugSteer; debugSense lists what is near you; debugNewRun starts a run.
+    debugSim: function (on) { sim.on = !!on; sim.dx = sim.dy = 0; sim.sprint = false; },
+    debugMode: function () { return mode; },
+    debugSteer: function (dx, dy, sprint) { sim.dx = dx; sim.dy = dy; sim.sprint = !!sprint; },
+    debugNewRun: function (diff) { try { localStorage.setItem(DIFF_KEY, diff); } catch (e) { /* private mode */ } startRun(); },
+    debugStep: function (dt, steps) {
+      var t0 = performance.now(), i;
+      for (i = 0; i < (steps || 1) && run && mode === 'play'; i++) update(dt);
+      return performance.now() - t0;
+    },
+    debugSense: function (rad) {
+      if (!run || mode !== 'play') return null;
+      var r = run, out = [], own = playerDesc().id, P = r.size;
+      r.npcs.forEach(function (o) {
+        if (o.dead || o.pod) return;
+        var dx = dxW(o.x, r.x), dy = o.y - r.y;
+        if (dx * dx + dy * dy > rad * rad) return;
+        var sp = o.sp, food = sp.kind === 'food';
+        var edible = food ? r.info.n <= FOOD_LAST_LEVEL && P >= o.size * 1.15
+          : sp.kind !== 'harmless' && !sp.sting && sp.id !== own && o.size >= P * edibleMin() && o.size <= P * 0.87;
+        // What can bite you: any fish that can bite does (fights, v0.10); a threat can also hunt or lock on.
+        var danger = (canBite(sp) && sp.id !== own && atkOf(o.size) >= 2 && o.size > P * 0.9) || isThreat(o, P) || o.locked;
+        out.push({ dx: dx, dy: dy, size: o.size, edible: edible, food: food, gain: edible && !sp.spiky ? mealGain(o) : 0, hp: o.hp, danger: danger, sting: !!sp.sting, locked: !!o.locked,
+          spiky: !!sp.spiky, len: lenFor(o.size, sp.shape) });
+      });
+      return { t: r.t, level: r.info.n, size: P, y: r.y, bed: bedY(r.x), goal: r.goal, hp: r.hp, maxHp: r.maxHp, stamina: r.stamina, lives: r.lives,
+        len: lenFor(P, 'round'), calm: r.calmT, inv: r.inv, things: out };
+    },
+    debugStats: function () {
+      if (!run) return null;
+      return { mode: mode, end: run.endReason || null, t: run.t, level: run.info.n, size: run.size, lives: run.lives, score: scoreOf(run), stats: run.stats,
+        path: (run.path || []).map(function (p) { return p.build; }) };
+    },
     // Test hook (v0.11): a creature of the given species id placed beside you. Read back through state().testCreature.
     debugSpawnCreature: function (id, size) {
       if (!run || mode !== 'play') return;
