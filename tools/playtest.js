@@ -4,6 +4,9 @@
 //   node tools/playtest.js            run every check
 //   node tools/playtest.js layout     button and joystick overlap at six screen sizes
 //   node tools/playtest.js allies     ally price rises with each buy and falls back when allies die
+//   node tools/playtest.js looks      every fish has a look and draws without an error
+//   node tools/playtest.js look       Settings → Look: four looks, saved, the dark look's short radar
+//   node tools/playtest.js seafull    every level has food and predators; small fish do not bite you
 //   node tools/playtest.js smoke [s]  play for s seconds (default 20) and report page errors
 //
 // Needs Playwright. In this environment it is preinstalled; the script looks in the global
@@ -11,44 +14,10 @@
 // Exit code 1 if any check fails, so it can gate a PR.
 
 'use strict';
-const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
-
-const ROOT = path.resolve(__dirname, '..');
-// The game's data (species, levels, fishLen), loaded the way the page loads it, so checks use the same numbers.
-const GAME_DATA = (function () {
-  const box = { window: {} };
-  require('vm').runInNewContext(fs.readFileSync(path.join(ROOT, 'js/species.js'), 'utf8'), box);
-  return box.window.FishData;
-})();
-
-function loadPlaywright() {
-  try { return require('playwright'); } catch (e) { /* fall through to the global install */ }
-  const global = execSync('npm root -g').toString().trim();
-  return require(path.join(global, 'playwright'));
-}
-
-// A tiny static server for the repo folder, so cookies and fetches behave as on a real host.
-function serve() {
-  const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json' };
-  return new Promise(function (resolve) {
-    const srv = http.createServer(function (req, res) {
-      const p = path.join(ROOT, decodeURIComponent(req.url.split('?')[0]) || 'index.html');
-      const file = p.endsWith('/') ? path.join(p, 'index.html') : p;
-      if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end(); return; }
-      res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
-      fs.createReadStream(file).pipe(res);
-    });
-    srv.listen(0, '127.0.0.1', function () { resolve({ srv: srv, url: 'http://127.0.0.1:' + srv.address().port + '/index.html' }); });
-  });
-}
-
-async function launch(chromium) {
-  const exe = '/opt/pw-browsers/chromium';
-  return chromium.launch(Object.assign({ args: ['--no-sandbox'] }, fs.existsSync(exe) ? { executablePath: exe } : {}));
-}
+const { ROOT, gameData, loadPlaywright, serve, launch } = require('./harness');
+const GAME_DATA = gameData();
 
 // Open the page, optionally in joystick mode, and start a run.
 async function startRun(browser, url, size, w, h, control) {
@@ -208,8 +177,9 @@ async function density(browser, url) {
     return { fish: st.census.fish, errors: ctx.errors };
   };
   const on = await fishAt('on'), off = await fishAt('off');
-  // v0.12: three times the old denser sea, so about 12 times the sparse count.
-  check('denser sea is on by default: about three times the old denser count', on.fish >= 250, 'fish with denser sea on=' + on.fish + ', off=' + off.fish);
+  // v0.12: three times the old denser sea, so about 12 times the sparse count. v0.13: the predators at level 1 are sized
+  // to you now and eat some prey in the first seconds, so test the ratio (and a floor), not an exact count.
+  check('denser sea is on by default: about three times the old denser count', on.fish >= 200 && on.fish >= 6 * off.fish, 'fish with denser sea on=' + on.fish + ', off=' + off.fish);
   check('turning denser sea off gives the sparse count', off.fish <= 40 && off.fish >= 10, 'fish with it off=' + off.fish);
   check('the trash toy is three times its old size', GAME_DATA.SPECIES.filter(function (x) { return x.id === 'toycar'; })[0].size === 4.8, 'toy size ' + GAME_DATA.SPECIES.filter(function (x) { return x.id === 'toycar'; })[0].size);
   check('no page errors (density)', on.errors.length === 0 && off.errors.length === 0, on.errors.concat(off.errors).join(' | '));
@@ -393,7 +363,7 @@ async function evolutionAndTide(browser, url) {
   check('your evolution path has one form for each level you reached', st.path.length === st.level && fits,
     'level ' + st.level + ', path ' + st.path.join(' > '));
   const form = GAME_DATA.SPECIES.filter(function (x) { return x.id === st.form; })[0];
-  const wantHp = Math.round(2 * (10 + Math.floor(st.size / 2)) * (form.hp || 1));
+  const wantHp = Math.round(GAME_DATA.TUNING.playerHp * (10 + Math.floor(st.size / 2)) * (form.hp || 1));   // the game's own formula (TUNING)
   check("your form's health applies to you", st.maxHp === wantHp,
     'form ' + st.form + ' (' + st.formBuild + ', hp x' + (form.hp || 1) + '): max health ' + st.maxHp + ', expected ' + wantHp);
   check('the sea is the same height on every level, and only its width grows',
@@ -454,7 +424,9 @@ async function edibleRules(browser, url) {
     await p.waitForTimeout(250);
   }
   const own = await p.evaluate(function () { return window.FishGame.state().testCreature; });
-  check('you never eat your own species', !!own && !own.dead && !!own0 && own.hp >= own0.hp,
+  // Other fish may nip it in a busy sea; one bite of yours would take more than this (your attack x playerBite).
+  const yourBite = (1 + Math.floor(70 / 8)) * GAME_DATA.TUNING.playerBite * 0.85;
+  check('you never eat your own species', !!own && !own.dead && !!own0 && own.hp > own0.hp - yourBite,
     'form ' + formId + ': hp ' + (own0 && own0.hp) + ' -> ' + (own && own.hp) + ', dead=' + (own && own.dead));
   check('no page errors (edible rules)', ctx.errors.length === 0, ctx.errors.join(' | '));
   await p.close();
@@ -571,7 +543,7 @@ async function harmlessIsNotFood(browser, url) {
   for (let i = 0; i < 16; i++) {
     await p.evaluate(function () {
       const s = window.FishGame.state();
-      if (s.testCreature && !s.testCreature.dead) window.FishGame.debugMove(s.testCreature.x - 30, s.testCreature.y);
+      if (s.testCreature && !s.testCreature.dead) window.FishGame.debugMove(s.testCreature.x - 10, s.testCreature.y);   // inside your reach (about 27 at size 3)
     });
     await p.waitForTimeout(250);
   }
@@ -663,7 +635,7 @@ async function creatures(browser, url) {
   for (let i = 0; i < 12; i++) {
     await p.evaluate(function () {
       const s = window.FishGame.state();
-      if (s.testCreature && !s.testCreature.dead) window.FishGame.debugMove(s.testCreature.x - 30, s.testCreature.y);
+      if (s.testCreature && !s.testCreature.dead) window.FishGame.debugMove(s.testCreature.x - 10, s.testCreature.y);   // inside your reach (about 27 at size 3)
     });
     await p.waitForTimeout(250);
   }
@@ -844,6 +816,90 @@ async function calm(browser, url) {
   await page.close();
 }
 
+// v0.13: every fish species has a look and draws without an error, at three sizes on screen (tiny, normal, close).
+async function looks(browser, url) {
+  const ctx = await startRun(browser, url, 0, 1024, 768);
+  const r = await ctx.page.evaluate(function () {
+    const c = document.createElement('canvas'); c.width = 300; c.height = 200; const g = c.getContext('2d');
+    const out = { drawn: 0, noLook: [], errors: [] };
+    window.FishData.SPECIES.forEach(function (sp) {
+      if (['plankton', 'krill', 'trash', 'crab', 'clam', 'rock', 'boat', 'sub', 'urchin', 'shrimp'].indexOf(sp.shape) >= 0) return;
+      if (!window.FishArt.lookOf(sp)) { out.noLook.push(sp.id); return; }
+      [6, 40, 160].forEach(function (px) {
+        try { g.save(); g.translate(150, 100); window.FishArt.draw(g, sp, px, { t: 1, ph: 0.3, sw: 0.8, lw: 1.5, px: px }); g.restore(); out.drawn++; }
+        catch (e) { out.errors.push(sp.id + ': ' + e.message); g.restore(); }
+      });
+    });
+    return out;
+  });
+  check('every fish species has a realistic look (js/fishart.js)', r.noLook.length === 0, r.noLook.length ? 'no look: ' + r.noLook.join(', ') : r.drawn + ' drawings');
+  check('every fish draws without an error at three sizes', r.errors.length === 0, r.errors.slice(0, 3).join(' | '));
+  check('no page errors (looks)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await ctx.page.close();
+}
+
+// v0.13: the sea is never empty. Before, nothing was big enough to eat or fear from level 13 on (species sizes were not
+// scaled with the goals). At each level there are fish you can eat and, below the top levels, fish that can eat you.
+async function seaFull(browser, url) {
+  const ctx = await startRun(browser, url, 0, 1024, 768);
+  const p = ctx.page;
+  const rows = [];
+  let ok = true;
+  for (const n of [5, 11, 14, 18]) {
+    await p.evaluate(function (g) { window.FishGame.debugSetSize(g); }, GAME_DATA.GOALS[n - 2] + 0.5);
+    await p.waitForTimeout(6500);   // the calm after a level-up, then a few refills
+    const st = await p.evaluate(function () { return window.FishGame.state(); });
+    rows.push('L' + st.level + ' edible ' + st.census.edible + ' threats ' + st.census.threat);
+    if (st.census.edible < 10 || (n < 17 && st.census.threat < 1)) ok = false;
+  }
+  check('every level has fish to eat and predators (levels 5, 11, 14, 18)', ok, rows.join(', '));
+  // A fish under half your size does not bite you (TUNING.nibbleMin).
+  await p.evaluate(function () { window.FishGame.debugSetSize(30); });
+  await p.waitForTimeout(5600);   // wait out the calm (you cannot be bitten during it)
+  const before = await p.evaluate(function () { const s = window.FishGame.debugStats(); return s.stats.dmgBy['Test fish'] || 0; });
+  for (let i = 0; i < 6; i++) {
+    await p.evaluate(function () { const s = window.FishGame.state(); window.FishGame.debugSpawnBeside(s.size * 0.4); });
+    await p.waitForTimeout(400);
+  }
+  const after = await p.evaluate(function () { const s = window.FishGame.debugStats(); return s.stats.dmgBy['Test fish'] || 0; });
+  check('a fish under half your size does not bite you', after === before, 'damage from small test fish: ' + (after - before));
+  check('no page errors (sea full)', ctx.errors.length === 0, ctx.errors.join(' | '));
+  await p.close();
+}
+
+// v0.13 Settings → Look: four looks; the choice is saved; each draws without an error; the dark look's radar is short
+// in the deep and unlimited near the surface on an early level.
+async function lookChoice(browser, url) {
+  const ctx = await startRun(browser, url, 0, 1024, 768);
+  const p = ctx.page;
+  await p.click('#gear');
+  await p.waitForTimeout(200);
+  const opts = await p.evaluate(function () { return Array.from(document.querySelectorAll('#look-select option')).map(function (o) { return o.value; }); });
+  check('Settings has a Look drop-down with four looks', opts.join(',') === 'real,pastel,ink,dark', opts.join(','));
+  await p.selectOption('#look-select', 'ink');
+  const saved = await p.evaluate(function () { return { ls: localStorage.getItem('fish_look'), look: window.FishGame.state().look }; });
+  check('choosing a look saves it and takes effect', saved.ls === 'ink' && saved.look === 'ink', JSON.stringify(saved));
+  await p.click('#panel-close').catch(function () {});
+  const shallow = [];
+  for (const look of ['real', 'pastel', 'ink', 'dark']) {
+    await p.evaluate(function (l) { localStorage.setItem('fish_look', l); }, look);
+    await p.reload(); await p.click('#btn-play'); await p.waitForTimeout(900);
+    const le = await p.evaluate(function () { return window.FishGame.loopErrors().length; });
+    shallow.push(look + ':' + le);
+  }
+  check('every look draws without an error', ctx.errors.length === 0 && shallow.every(function (x) { return x.endsWith(':0'); }), shallow.join(' ') + ' ' + ctx.errors.join(' | '));
+  const near = await p.evaluate(function () { return window.FishGame.debugRadar(); });   // dark look, level 1
+  await p.evaluate(function (g) { window.FishGame.debugSetSize(g); }, GAME_DATA.GOALS[13] + 0.5);   // level 15
+  await p.waitForTimeout(5800);
+  const deep = await p.evaluate(function () { const s = window.FishGame.state(); window.FishGame.debugMove(s.px, window.FishGame.bedAt(s.px) - 60); return 0; });
+  await p.waitForTimeout(400);
+  const far = await p.evaluate(function () { return { radar: window.FishGame.debugRadar(), W: window.FishGame.state().W }; });
+  check('dark look: the radar sees the whole sea on level 1, and only nearby by the seabed on level 15',
+    near === -1 && far.radar > 0 && far.radar < far.W / 3, 'level 1 radar ' + near + ', level 15 by the seabed ' + Math.round(far.radar) + ' of a sea ' + far.W + ' wide' + deep);
+  await p.evaluate(function () { localStorage.removeItem('fish_look'); });
+  await p.close();
+}
+
 async function smoke(browser, url, seconds) {
   const ctx = await startRun(browser, url, 12, 1024, 768, 'joystick');
   for (let i = 0; i < 3; i++) { await ctx.page.click('#ally'); await ctx.page.waitForTimeout(100); }
@@ -885,8 +941,11 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'schoolcap') await schoolCap(browser, url);
     if (which === 'all' || which === 'buttons') await buttonsAndMap(browser, url);
     if (which === 'all' || which === 'smooth') await smoothness(browser, url);
+    if (which === 'all' || which === 'looks') await looks(browser, url);
+    if (which === 'all' || which === 'look') await lookChoice(browser, url);
+    if (which === 'all' || which === 'seafull') await seaFull(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'notes', 'growth', 'schoolcap', 'buttons', 'smooth', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'notes', 'growth', 'schoolcap', 'buttons', 'smooth', 'looks', 'look', 'seafull', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {

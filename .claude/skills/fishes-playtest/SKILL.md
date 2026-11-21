@@ -38,8 +38,24 @@ Rules for using the hook:
 
 Add a function to `tools/playtest.js` that calls `check(name, ok, detail)`, then add it to the `main` dispatch. A check should fail for the reason the user cares about, and print the numbers that explain it.
 
+## Balance (tools/balance.js)
+
+`node tools/playtest.js` checks rules; `node tools/balance.js` measures pacing. It plays whole games with a bot
+(about 30x real time) and prints run length, seconds per level, lives lost and what took them, with flags against the
+schematic's targets.
+
+```bash
+node tools/balance.js                                   # 4 games each, medium and hard, average bot (about 4 min)
+node tools/balance.js --diff easy,medium,hard --skill novice,average,expert --quiet   # the full sweep (about 10 min)
+node tools/balance.js --tune mealDiv=6,playerHp=3       # try TUNING values without editing the code
+node tools/balance.js --start 11 --minutes 5            # look at the late game only
+```
+
+Bot results are a guide, not the truth: a person plays differently. Use them to find walls (a level much slower than
+its neighbours), dead ends (an empty sea), and what kills. Ask for a timed run on a device before calling a balance done.
+
 ## What headless can't tell you
 
 - Touch feel and iPad sizing. Say so in the report, and ask for a device check.
 - Whether a fish looks right. Use a screenshot only when the user asks for visual review.
-- Balance. Headless runs show crashes and rule violations, not whether a level feels fair. Ask for a timed run on a device.
+- How balance feels. `tools/balance.js` measures pacing with a bot; ask for a timed run on a device as well.

@@ -416,11 +416,13 @@
 
   // Depth zones: the sea gets deeper, bigger and darker tier by tier.
   var ZONES = [
-    { name: 'Sunny Shallows', top: '#dff8f1', bottom: '#b8ead8', sand: '#f7e6bf', rays: true },
-    { name: 'Coral Reef', top: '#d6f3f7', bottom: '#a9e1ec', sand: '#f4dcc8', rays: true },
-    { name: 'Open Blue', top: '#c6e4fb', bottom: '#8fc3ec', sand: '#d9e7f3', rays: false },
-    { name: 'Twilight', top: '#c9c8f0', bottom: '#8d8fd0', sand: '#b9b6dc', rays: false },
-    { name: 'Deep Trench', top: '#6f73b5', bottom: '#333b74', sand: '#2a3163', rays: false }
+    // v0.13: real sea colours (pastel: the soft colours of 0.12 and before, for Settings → Look → Pastel). top: the water just under the surface; bottom: at the seabed. light: sun rays and
+    // ripples of light on the sand (0 = none). kelp: what grows on the bottom. reef: what else lies on it.
+    { name: 'Sunny Shallows', pastel: { top: '#dff8f1', bottom: '#b8ead8', sand: '#f7e6bf' }, top: '#78d6dc', bottom: '#2a9ab4', sand: '#e2cc98', light: 1, kelp: 'grass', reef: 'shallow', rays: true },
+    { name: 'Coral Reef', pastel: { top: '#d6f3f7', bottom: '#a9e1ec', sand: '#f4dcc8' }, top: '#5ccae0', bottom: '#1a7eb0', sand: '#ead8b8', light: 0.9, kelp: 'grass', reef: 'coral', rays: true },
+    { name: 'Open Blue', pastel: { top: '#c6e4fb', bottom: '#8fc3ec', sand: '#d9e7f3' }, top: '#3aa0da', bottom: '#0c4c92', sand: '#8e9eaa', light: 0.55, kelp: 'kelp', reef: 'open', rays: true },
+    { name: 'Twilight', pastel: { top: '#c9c8f0', bottom: '#8d8fd0', sand: '#b9b6dc' }, top: '#1d5a96', bottom: '#09224c', sand: '#46526a', light: 0.15, kelp: 'none', reef: 'twilight', rays: false },
+    { name: 'Deep Trench', pastel: { top: '#6f73b5', bottom: '#333b74', sand: '#2a3163' }, top: '#103664', bottom: '#030b20', sand: '#20283a', light: 0, kelp: 'none', reef: 'trench', rays: false }
   ];
 
   var LEVEL_NAMES = [
@@ -436,13 +438,13 @@
 
   // Size needed to leave each tier, before scaling (tier 20 = 100 = the largest fish ever, at START_SIZE 1).
   // v0.11 pacing. SPAN_BASE is each level's size gain as it was (sizes 3 to 300 over 20 levels).
-  // Levels 1-5 need three times that much growth (more food before you move on); later levels need 13% less,
-  // so the largest fish is still about 300. Each meal still gives the same growth as before (levelInfo.meal).
+  // Levels 1-4 need three times that much growth (more food before you move on); later levels need 8.5% less,
+  // so the largest fish is still about 300. (v0.13: level 5 was also tripled, and it took 2-5 minutes in tools/balance.js.) Each meal still gives the same growth as before (levelInfo.meal).
   var SPAN_BASE = [3, 3, 3, 3, 6, 6, 6, 9, 9, 12, 12, 15, 18, 21, 21, 24, 27, 30, 33, 36];
   var GOALS = (function () {
     var out = [], g = START_SIZE, i;
     for (i = 0; i < SPAN_BASE.length; i++) {
-      g += SPAN_BASE[i] * (i < 5 ? 3 : 0.87);
+      g += SPAN_BASE[i] * (i < 4 ? 3 : 0.915);   // v0.13: levels 1-4 (the plankton levels); level 5 took 2-5 minutes at 3x
       out.push(g);
     }
     return out;
@@ -502,7 +504,7 @@
     VERSION_DATE: '2026-11-07',
     // Build stamp: changes on every merge, with the ?b= on the script and style links in index.html. It shows on the title
     // screen and in Settings, so a device running an old cached copy can be told apart from the current build.
-    BUILD: '2026-11-09.2',
+    BUILD: '2026-11-21.2',
     TIME_LIMIT: 900,                    // hard stop at 15 minutes
     LIVES: 3,
     TENSION: { start: 150, full: 300 }, // harder from 2:30, full by 5:00 (raises the predator share by up to 50%)
@@ -513,7 +515,36 @@
     notesTable: 'fish_notes'
   };
 
+  // Balance knobs in one place (v0.13). tools/balance.js runs whole games headless and can override any of these
+  // for a test run (window.FishTuning, set before this script loads), so a change can be measured before it ships.
+  var TUNING = {
+    playerSpeed: 230,      // your base swimming speed (world units a second); +3% a level, times your form's speed
+    sprint: 2.1,           // sprint multiplies your speed by this
+    biteS: 1.0,            // seconds between your bites
+    strikeS: 0.9,          // seconds between a fish's bites
+    playerHp: 2.6,         // your health = this x (10 + size / 2), times your form's health (v0.13: was 2)
+    regen: 0.08,           // share of your max health a second you regain after 4 seconds without a hit (v0.13: was a flat 3,
+                           // 14% a second at level 1 but under 2% at level 15, so late fights piled up)
+    mealDiv: 5,            // a fish meal gives at least 1/mealDiv of the level's span (so at most mealDiv meals a level; v0.13: was 9)
+    mealDivMid: 7,         // the same for levels 8-10 (family note 2026-11-08: a little slower there; v0.13: was 12)
+    mealDivTop: 6,         // the same for level 20 (v0.13: was 10)
+    mealMin: 3,            // v0.13: a fish meal gives at most 1/mealMin of the level's span, so a level is never one or two meals
+    playerBite: 2,         // v0.13: your bite does this x your attack (prey of your level take about 3-5 bites, not 8-16)
+    lateHp: 1,             // from level 10, fish have this x the health (v0.13: was 2; with playerBite 2 every late meal was an even fight)
+    fishScale: 3,          // v0.13: wild fish are this x their listed size (= START_SIZE, as the level goals are); see spSize in game.js
+    nibbleMin: 0.5,        // v0.13: a fish under this share of your size does not bite you (it is too small to take you on)
+    fishBase: 22,          // wild fish in the sea: (fishBase + fishPerLevel x level) x 12 on the denser sea
+    fishPerLevel: 3,
+    threatCap: 0.7,        // the predator share never passes this
+    tensionBoost: 0.5,     // from 2:30 to 5:00 the predator share rises by up to this fraction
+    lockRate: 0.4,         // chance a second that a hunter in range locks on (plus lockTension x tension)
+    lockTension: 0.6,
+    deathShrink: 0.75      // losing a life shrinks you to this share of your size (never below the level's start)
+  };
+  if (window.FishTuning) Object.keys(window.FishTuning).forEach(function (k) { if (k in TUNING) TUNING[k] = window.FishTuning[k]; });
+
   window.FishData = {
+    TUNING: TUNING,
     SPECIES: SPECIES,
     ZONES: ZONES,
     GOALS: GOALS,
