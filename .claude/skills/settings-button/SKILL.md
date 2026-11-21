@@ -15,6 +15,7 @@ The ⚙️ button opens the settings panel (`#panel` in `index.html`). The game 
   2. is set in `openPanel()` in `js/game.js` (`aria-pressed` and the text On/Off),
   3. has a click handler that saves to `localStorage` (a key like `fish_healthbars`) and updates the text.
   Current toggles: Sound, Show errors, Health bars, Denser sea, Controls.
+- **Look** (v0.13, `#look-select`, a `<select>` near the top, outside the folds): real, pastel, ink, dark. Saved as `fish_look`. `LOOK` in `js/game.js` drives the sea and the fog; `FishArt.setStyle` restyles the fish. Checked by `node tools/playtest.js look`.
 - **Notes for Jimmy** (a `<details class="fold note-box">`): the note text box, the device list, the database line, and the **status list** (`#status-list`).
 - **Family sign-in** (`#family-email`, `#family-pass`, `#family-in`, `#family-out`): the account that can read and change family notes. The password is never stored.
 

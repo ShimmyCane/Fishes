@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#dff8f1">
   <title>Fishes</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="css/style.css?b=2026-11-21.1">
+  <link rel="stylesheet" href="css/style.css?b=2026-11-21.2">
 </head>
 <body data-mode="title">
 
@@ -113,6 +113,15 @@
     <div class="panel-card">
       <h2>Settings</h2>
       <p class="version" id="panel-version">Fishes v0.5 · 2026-11-03</p>
+      <div class="row look-row">
+        <label for="look-select">Look</label>
+        <select id="look-select" class="look-select">
+          <option value="real">Realistic</option>
+          <option value="pastel">Pastel</option>
+          <option value="ink">Ink (blue paper)</option>
+          <option value="dark">Dark (fog in the deep)</option>
+        </select>
+      </div>
       <details class="fold">
         <summary><span>Sound, errors, display and controls</span></summary>
         <div class="row">
@@ -197,11 +206,11 @@
   <div id="errors" class="errors" hidden></div>
 
   <!-- ?b= is the build (CONFIG.BUILD in js/species.js). Change both on every merge, so browsers fetch the new files. -->
-  <script src="js/species.js?b=2026-11-21.1"></script>
-  <script src="js/sound.js?b=2026-11-21.1"></script>
-  <script src="js/family.js?b=2026-11-21.1"></script>
-  <script src="js/notes.js?b=2026-11-21.1"></script>
-  <script src="js/fishart.js?b=2026-11-21.1"></script>
-  <script src="js/game.js?b=2026-11-21.1"></script>
+  <script src="js/species.js?b=2026-11-21.2"></script>
+  <script src="js/sound.js?b=2026-11-21.2"></script>
+  <script src="js/family.js?b=2026-11-21.2"></script>
+  <script src="js/notes.js?b=2026-11-21.2"></script>
+  <script src="js/fishart.js?b=2026-11-21.2"></script>
+  <script src="js/game.js?b=2026-11-21.2"></script>
 </body>
 </html>

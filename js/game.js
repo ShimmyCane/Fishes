@@ -35,6 +35,12 @@
   try { best = Number(localStorage.getItem('fish_best')) || 0; } catch (e) { best = 0; }
   try { showErrors = localStorage.getItem('fish_show_errors') === 'on'; } catch (e) { showErrors = false; }
   try { control = localStorage.getItem('fish_control') === 'joystick' ? 'joystick' : 'tap'; } catch (e) { control = 'tap'; }
+  // v0.13 Settings → Look: real (realistic), pastel (soft and simple), ink (ink drawings on blue paper),
+  // dark (fog of war that thickens with depth and level; the radar reaches only about 3x what you can see).
+  var LOOK = 'real';
+  try { LOOK = localStorage.getItem('fish_look') || 'real'; } catch (e) { LOOK = 'real'; }
+  if (['real', 'pastel', 'ink', 'dark'].indexOf(LOOK) < 0) LOOK = 'real';
+  if (window.FishArt) FishArt.setStyle(LOOK);
 
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
   function rand(a, b) { return a + Math.random() * (b - a); }
@@ -145,7 +151,33 @@
 
   // v0.13: the water darkens with depth. The screen shows the colour of the water at the depth it is looking at,
   // from the zone's surface colour to its seabed colour, so swimming down feels like going deeper.
-  function waterAt(z, y) { return hexMix(z.top, z.bottom, clamp(y / (run ? run.info.H : 2000), 0, 1)); }
+  function waterAt(z, y) {
+    var f = clamp(y / (run ? run.info.H : 2000), 0, 1), zi = D.ZONES.indexOf(z);
+    if (LOOK === 'pastel') return hexMix(z.pastel.top, z.pastel.bottom, f);
+    if (LOOK === 'ink') return hexMix(hexMix('#eef3f6', '#c4d4df', zi / 4), hexMix('#c9d7e1', '#7f98ac', zi / 4), f);
+    var c = hexMix(z.top, z.bottom, f);
+    return LOOK === 'dark' ? hexMix(c, '#01040a', darkness(y) * 0.75) : c;
+  }
+  // Dark look: how dark the water is at depth y, 0 (light) to 1. Light at the surface and on levels 1-3;
+  // darker with depth and with the level, darkest by the seabed (fog of war).
+  function darkness(y) {
+    if (!run) return 0;
+    var lv = clamp((run.info.n - 3) / 6, 0, 1), dp = clamp((y - 250) / (run.info.H * 0.7), 0, 1);
+    return clamp(lv * (0.25 + 0.75 * dp), 0, 1);
+  }
+  // A paper texture for the ink look: fibres and specks, made once, tiled over the scene.
+  var paperTex = null;
+  function paperPattern() {
+    if (paperTex) return paperTex;
+    var c = document.createElement('canvas'), g, i;
+    c.width = c.height = 256; g = c.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 256);
+    for (i = 0; i < 900; i++) { g.fillStyle = 'rgba(40,70,100,' + (Math.random() * 0.12).toFixed(3) + ')'; g.fillRect(Math.random() * 256, Math.random() * 256, 1.2, 1.2); }
+    g.strokeStyle = 'rgba(40,70,100,0.06)'; g.lineWidth = 1;
+    for (i = 0; i < 70; i++) { var x = Math.random() * 256, y = Math.random() * 256, a = Math.random() * 3; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 18, y + Math.sin(a) * 18); g.stroke(); }
+    paperTex = ctx.createPattern(c, 'repeat');
+    return paperTex;
+  }
   function paintSea(z) {
     var y0 = run ? cam.y - CH / 2 / cam.scale : 0, y1 = run ? cam.y + CH / 2 / cam.scale : 2000;
     var g = ctx.createLinearGradient(0, 0, 0, CH);
@@ -165,6 +197,15 @@
     }
     // Marine snow drifts down slowly (two layers, the far one slower and fainter); a few bubbles rise.
     var px = run ? cam.x * cam.scale : 0, py = run ? cam.y * cam.scale : 0, deep = run ? run.info.zoneIndex >= 3 : false;
+    if (LOOK === 'pastel') {   // the soft look: a few round outlined bubbles, as before 0.13
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2;
+      bubbles.forEach(function (b, i) {
+        if (i % 3) return;
+        var y = (((b.y - t * 0.04) % 1) + 1) % 1;
+        ctx.beginPath(); ctx.arc(b.x * CW + Math.sin(t + b.p) * 10, y * CH, 2 + b.r * 2.5, 0, Math.PI * 2); ctx.stroke();
+      });
+      return;
+    }
     bubbles.forEach(function (b) {
       var y = ((((b.y - t * b.s) * CH - py * b.z * 0.15) % CH) + CH) % CH;
       var x = ((((b.x * CW + Math.sin(t * 0.5 + b.p) * 8) - px * b.z * 0.15) % CW) + CW) % CW;
@@ -173,7 +214,7 @@
         ctx.beginPath(); ctx.arc(x, y, b.r, 0, Math.PI * 2); ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.arc(x - b.r * 0.35, y - b.r * 0.35, b.r * 0.3, 0, Math.PI * 2); ctx.fill();
       } else {
-        ctx.fillStyle = deep ? 'rgba(190,230,255,' + (b.a * 0.8).toFixed(2) + ')' : 'rgba(240,250,255,' + b.a.toFixed(2) + ')';
+        ctx.fillStyle = LOOK === 'ink' ? 'rgba(26,42,60,' + (b.a * 0.5).toFixed(2) + ')' : deep ? 'rgba(190,230,255,' + (b.a * 0.8).toFixed(2) + ')' : 'rgba(240,250,255,' + b.a.toFixed(2) + ')';
         ctx.fillRect(x, y, b.r * b.z * 1.6, b.r * b.z * 1.6);
       }
     });
@@ -181,7 +222,7 @@
 
   // v0.13: shafts of sunlight from the surface, fading with depth (shallow zones only). Drawn in world space.
   function drawRays(z, t) {
-    if (!z.light) return;
+    if (!z.light || LOOK === 'pastel' || LOOK === 'ink') return;
     var halfW = CW / 2 / cam.scale, x0 = cam.x - halfW - 400, x1 = cam.x + halfW + 400, step = 260, i;
     var depth = 1100 * z.light + 300;
     if (cam.y - CH / 2 / cam.scale > depth) return;
@@ -198,13 +239,36 @@
     ctx.restore();
   }
 
+  // v0.13 Dark look: fog of war. You see a pool around you; past it the sea fades to black. The pool shrinks with
+  // depth and with the level, and is smallest by the seabed. Light at the surface and on levels 1-3.
+  function fogRadius() {   // the clear radius in screen pixels, and how dark the rest is
+    var f = darkness(run.y), bed = clamp(1 - (bedY(run.x) - run.y) / 500, 0, 1) * clamp((run.info.n - 3) / 6, 0, 1);
+    var plen = lenFor(run.size, 'round') * cam.scale, big = Math.hypot(CW, CH) / 2;
+    var r0 = plen * 2.2 + (1 - f) * (1 - 0.5 * bed) * big;
+    return { r0: r0, r1: r0 + Math.min(CW, CH) * 0.3, a: clamp(0.35 + 0.6 * f + 0.15 * bed, 0, 0.96), f: f, bed: bed };
+  }
+  function drawFog() {
+    if (!run) return;
+    var fr = fogRadius(), sx = CW / 2 + dxW(run.x, cam.x) * cam.scale, sy = CH / 2 + (run.y - cam.y) * cam.scale;
+    if (fr.f <= 0.01 && fr.bed <= 0.01) {   // the light part of the sea: only a soft vignette
+      var r = Math.hypot(CW, CH) / 2, vg = ctx.createRadialGradient(CW / 2, CH / 2, r * 0.5, CW / 2, CH / 2, r);
+      vg.addColorStop(0, 'rgba(0,6,16,0)'); vg.addColorStop(1, 'rgba(0,6,16,0.3)');
+      ctx.fillStyle = vg; ctx.fillRect(0, 0, CW, CH); return;
+    }
+    var g = ctx.createRadialGradient(sx, sy, fr.r0, sx, sy, fr.r1);
+    g.addColorStop(0, 'rgba(1,4,10,0)'); g.addColorStop(1, 'rgba(1,4,10,' + fr.a.toFixed(3) + ')');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, CW, CH);
+  }
+
   // v0.13: the edges of the view fade into the water, and in the dark zones a soft light goes with you.
   function drawVignette(z) {
+    if (LOOK === 'pastel') return;
+    if (LOOK === 'dark') { drawFog(); return; }
     var r = Math.hypot(CW, CH) / 2, g = ctx.createRadialGradient(CW / 2, CH / 2, r * 0.45, CW / 2, CH / 2, r);
     var deep = z === D.ZONES[4] ? 0.55 : z === D.ZONES[3] ? 0.4 : 0.22;
     g.addColorStop(0, 'rgba(0,10,25,0)'); g.addColorStop(1, 'rgba(0,10,25,' + deep + ')');
     ctx.fillStyle = g; ctx.fillRect(0, 0, CW, CH);
-    if (run && run.info.zoneIndex >= 3) {
+    if (LOOK === 'real' && run && run.info.zoneIndex >= 3) {
       var sx = CW / 2 + dxW(run.x, cam.x) * cam.scale, sy = CH / 2 + (run.y - cam.y) * cam.scale, rr = lenFor(run.size, 'round') * cam.scale * 2.2;
       var lg = ctx.createRadialGradient(sx, sy, 0, sx, sy, rr);
       lg.addColorStop(0, 'rgba(150,220,255,0.14)'); lg.addColorStop(1, 'rgba(150,220,255,0)');
@@ -1575,8 +1639,11 @@
   }
 
   // The seabed: a bumpy line of hills, sand below it. It tiles with the sea.
-  function drawSeabed(zone, t) {
+  function drawSeabed(zone0, t) {
     var halfW = CW / 2 / cam.scale + 60, x0 = cam.x - halfW, x1 = cam.x + halfW, x, H = run.info.H;
+    // v0.13 looks: the pastel and ink sands; dark keeps the real sand, darkened by the fog.
+    var zone = LOOK === 'pastel' ? { sand: zone0.pastel.sand, bottom: zone0.pastel.bottom, light: 0 }
+      : LOOK === 'ink' ? { sand: '#e8eef2', bottom: '#9fb4c4', light: 0 } : zone0;
     if (cam.y + CH / 2 / cam.scale < H - 420) return;   // v0.13: the seabed is out of view
     // v0.13: a far ridge behind the seabed, hazy with the water's colour, moving slower than you (depth).
     ctx.fillStyle = hexMix(zone.sand, zone.bottom, 0.72);
@@ -1788,9 +1855,19 @@
     mapCtx.fillStyle = '#ff7fb0';
     (run.anemones || []).forEach(function (a) { mapCtx.fillRect(mx(a.x) - 3, my(a.y) - 3, 6, 6); });   // v0.11: bigger dots on the mini map
     mapCtx.fillStyle = '#ff7a6b';
+    // v0.13 dark look: the radar reaches only about 3x as far as you can see, and less by the seabed.
+    var radar = Infinity;
+    if (LOOK === 'dark') {
+      var fr = fogRadius();
+      if (fr.f > 0.01 || fr.bed > 0.01) {
+        radar = 3 * fr.r0 / cam.scale;
+        mapCtx.strokeStyle = 'rgba(255,122,107,0.5)'; mapCtx.lineWidth = 1;
+        mapCtx.beginPath(); mapCtx.ellipse(mx(run.x), my(run.y), radar / W * w, radar / H * h, 0, 0, Math.PI * 2); mapCtx.stroke();
+      }
+    }
     run.npcs.forEach(function (o) {
       if (o.dead || o.pod || o.sp.kind === 'food') return;
-      if (canHurt(o.sp) && o.size >= P * 1.1) {
+      if (canHurt(o.sp) && o.size >= P * 1.1 && distW(o, run) < radar) {
         mapCtx.beginPath(); mapCtx.arc(mx(o.x), my(o.y), 4.5, 0, Math.PI * 2); mapCtx.fill();
       }
     });
@@ -1832,6 +1909,7 @@
     list = list.map(function (e) { return Object.assign({}, e, { x: viewX(e.x) }); });
     list.forEach(function (e) { drawEntity(e, t + (e.t || 0)); });
 
+    var marks = [];
     list.forEach(function (e) {
       var shape = e.isPlayer ? e.desc.shape : e.sp.shape;
       var len = lenFor(e.size, shape);
@@ -1842,13 +1920,11 @@
       }
       if (e.isPlayer || e.sp.kind === 'food' || e.sp.kind === 'harmless') return;
       // Readable at a glance: coral = can hurt you, mint = you can eat it.
+      // v0.13: kept as screen points and drawn after the ink toning, so they keep their colours in every look.
       var danger = canHurt(e.sp) && e.size >= run.size * 1.1;
       var edible = !danger && run.size >= e.size * 1.15 && e.size >= run.size * edibleMin();
       if (!danger && !edible) return;
-      ctx.fillStyle = danger ? '#ff7a6b' : '#7fd8a8';
-      ctx.beginPath();
-      ctx.arc(e.x, e.y - len * 0.65 - 22 / cam.scale, 4 / cam.scale, 0, Math.PI * 2);
-      ctx.fill();
+      marks.push({ x: CW / 2 + (e.x - cam.x) * cam.scale, y: CH / 2 + (e.y - len * 0.65 - 22 / cam.scale - cam.y) * cam.scale, c: danger ? '#ff7a6b' : '#7fd8a8' });
     });
 
     // Bite timer: a ring round you that fills up as your next bite comes ready.
@@ -1908,7 +1984,18 @@
       }
     });
     ctx.restore();
-    drawVignette(z);   // v0.13
+    if (LOOK === 'ink') {   // v0.13 ink look: the whole scene in blue ink tones on paper
+      ctx.save();
+      ctx.globalCompositeOperation = 'saturation'; ctx.fillStyle = '#808080'; ctx.fillRect(0, 0, CW, CH);
+      ctx.globalCompositeOperation = 'color'; ctx.globalAlpha = 0.85; ctx.fillStyle = '#3a6a9a'; ctx.fillRect(0, 0, CW, CH);
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = paperPattern(); ctx.fillRect(0, 0, CW, CH);
+      ctx.restore();
+    }
+    marks.forEach(function (m) {
+      ctx.fillStyle = m.c; ctx.beginPath(); ctx.arc(m.x, m.y, 4, 0, Math.PI * 2); ctx.fill();
+      if (LOOK === 'ink') { ctx.strokeStyle = '#1a2a3c'; ctx.lineWidth = 1; ctx.stroke(); }
+    });
+    drawVignette(z);   // v0.13 (in the dark look, the fog)
   }
 
   // v0.12 tide: white streaks that churn, then stream with the pull, across the view.
@@ -2090,6 +2177,7 @@
     $('errors-toggle').textContent = showErrors ? 'On' : 'Off';
     $('hp-toggle').setAttribute('aria-pressed', String(healthBarsOn()));
     $('hp-toggle').textContent = healthBarsOn() ? 'On' : 'Off';
+    $('look-select').value = LOOK;
     $('dense-toggle').setAttribute('aria-pressed', String(denseOn()));
     $('dense-toggle').textContent = denseOn() ? 'On' : 'Off';
     $('trash-toggle').setAttribute('aria-pressed', String(trashOn()));
@@ -2352,6 +2440,11 @@
     $('bg-toggle').textContent = on ? 'On' : 'Off';
     if (run && mode === 'play') fillCreatures();   // takes effect at once: off removes the background items, on brings them back
   });
+  $('look-select').addEventListener('change', function () {   // v0.13 Settings → Look
+    LOOK = $('look-select').value;
+    try { localStorage.setItem('fish_look', LOOK); } catch (e) { /* private mode */ }
+    if (window.FishArt) FishArt.setStyle(LOOK);
+  });
   $('dense-toggle').addEventListener('click', function () {
     var on = !denseOn();
     try { localStorage.setItem('fish_dense', on ? 'on' : 'off'); } catch (e) { /* private mode */ }
@@ -2467,6 +2560,8 @@
     // steps x dt with the steering from debugSteer; debugSense lists what is near you; debugNewRun starts a run.
     debugSim: function (on) { sim.on = !!on; sim.dx = sim.dy = 0; sim.sprint = false; },
     debugMode: function () { return mode; },
+    // v0.13: the radar range in the dark look (world units; -1 when the radar sees the whole sea).
+    debugRadar: function () { if (!run) return null; if (LOOK !== 'dark') return -1; var fr = fogRadius(); return fr.f > 0.01 || fr.bed > 0.01 ? 3 * fr.r0 / cam.scale : -1; },
     debugSteer: function (dx, dy, sprint) { sim.dx = dx; sim.dy = dy; sim.sprint = !!sprint; },
     debugNewRun: function (diff) { try { localStorage.setItem(DIFF_KEY, diff); } catch (e) { /* private mode */ } startRun(); },
     debugStep: function (dt, steps) {
@@ -2570,7 +2665,7 @@
     debugHurtAllies: function (d) { if (run) run.npcs.forEach(function (o) { if (o.ally && !o.dead) o.hp = Math.max(0.1, o.hp - d); }); },
     state: function () {
       return {
-        mode: mode, level: run && run.level, size: run && run.size, npcs: run ? run.npcs.length : 0,
+        mode: mode, look: LOOK, level: run && run.level, size: run && run.size, npcs: run ? run.npcs.length : 0,
         eaten: run ? run.eaten : 0, allySpent: run ? run.allySpent || 0 : 0,
         px: run ? run.x : null, py: run ? run.y : null, W: run ? run.info.W : null, hidden: run ? !!run.hidden : null,
         anemones: run && run.anemones ? run.anemones : null,

@@ -364,6 +364,20 @@ h3 { margin: 0 0 6px; font-size: 1.2rem; font-weight: 900; }
 
 .toggle[aria-pressed="true"] { background: var(--mint); }
 
+/* v0.13: the Look drop-down (realistic, pastel, ink, dark) */
+.look-select {
+  min-width: 170px;
+  min-height: 52px;
+  padding: 0 12px;
+  border: var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+  box-shadow: 0 4px 0 var(--ink);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .note-box {
   margin-top: 14px;
   padding: 14px;

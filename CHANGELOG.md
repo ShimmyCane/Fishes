@@ -3,6 +3,11 @@
 Every version the team can open, newest first. The version shows on the title screen and at the top of ⚙️ Settings. If you see a different version there than below, you are looking at an older copy.
 
 ## 0.12 — unreleased
+- **Settings → Look** (a drop-down near the top of ⚙️) picks how the sea looks. The choice is kept on the device.
+  - **Realistic:** the new realistic fish and sea (the default).
+  - **Pastel:** soft, light colours for fish and sea, firm outlines, big friendly eyes, no fine detail.
+  - **Ink:** the fish as black-and-white ink drawings with pen hatching, on a paper-textured sea, the whole scene toned blue like an old blue-sepia print.
+  - **Dark:** a scarier sea. Past a pool of light around you the water fades to black, and the radar (the mini map) shows predators only within about three times what you can see. The fog thickens with depth and with the level, and is worst by the seabed. Near the surface and on levels 1 to 3 it stays light.
 - **A more realistic sea.** Every fish is drawn from its real body plan: reef fish, tuna with finlets and a crescent tail, sharks with gill slits and a longer top tail lobe, marlin and sailfish with bills, eels, flatfish, the ocean sunfish, the manta ray, anglerfish with glowing lures. Each has its own markings and natural colours (dark back, pale belly): the clownfish's white bands, the blue tang's black "palette", the mackerel's wavy bars, the great white's grey back and white belly, the whale shark's spots.
 - **Fish swim.** The tail beats faster when a fish swims hard and slower when it is big, the side fins row, and the body flexes. Jellyfish pulse, turtles row with their flippers, plankton is tiny see-through copepods.
 - **The water darkens as you go deeper**, from turquoise shallows to the black trench. Sun rays shine down from the surface, light ripples over the sand, specks of marine snow drift past, and in the twilight and the trench a faint light goes with you.

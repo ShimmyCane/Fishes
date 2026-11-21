@@ -350,11 +350,54 @@
     if (sp.glow) p.push({ t: 'photo', c: '#a8f0ff' });
     return p;
   }
+  // ---------- looks (v0.13 Settings → Look): realistic, pastel, ink, dark ----------
+  // pastel: soft, light colours, a firm outline, cartoon eyes, no fine detail.
+  // ink: an ink drawing on pale blue paper: paper-white body, dark ink outline and markings, hatching for shade.
+  //   (game.js then tones the whole scene blue, so colours left on creatures and items read as blue ink too.)
+  // dark: the realistic fish, a little dimmer. The fog and the short radar are game.js's.
+  var style = 'real';
+  function lum(hex) { var c = rgb(hex); return (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) / 255; }
+  function pastel(hex) { return shade(hexOf(mix(hex, '#f4ecff', 0.12)), 0.42); }
+  var INK = '#1a2a3c', PAPER = '#f1f5f8';
+  function inked(hex) { var l = lum(hex); return l < 0.45 ? INK : l < 0.75 ? '#6a8094' : '#ffffff'; }
+  function styled(lk) {
+    var o = {}, k;
+    for (k in lk) o[k] = lk[k];
+    var keys = ['col', 'back', 'belly', 'fin', 'tailCol', 'tip', 'finlets'];
+    if (style === 'pastel') {
+      keys.forEach(function (k2) { if (typeof o[k2] === 'string' && o[k2].charAt(0) === '#') o[k2] = pastel(o[k2]); });
+      o.back = shade(o.col, -0.12); o.belly = shade(o.col, 0.35);
+      o.edge = '#2d3a4a'; o.lineK = 1.35; o.lineA = 1; o.shine = 0; o.cartoonEye = true; o.alpha = 0;
+      o.pat = (lk.pat || []).filter(function (p) { return p.t !== 'scales' && p.t !== 'mottle' && p.t !== 'photo'; })
+        .map(function (p) { var q = {}, j; for (j in p) q[j] = p[j]; if (q.c) q.c = pastel(q.c); if (q.edge) q.edge = pastel(q.edge); if (q.ring) q.ring = pastel(q.ring); return q; });
+      o.iris = '#ffffff';
+    } else if (style === 'ink') {
+      o.col = PAPER; o.back = '#d6e1ea'; o.belly = '#ffffff'; o.fin = '#e6eef4'; o.tailCol = '#e6eef4';
+      o.tip = lk.tip ? INK : null; o.finlets = lk.finlets ? INK : lk.finlets;
+      o.edge = INK; o.lineK = 1.25; o.lineA = 1; o.shine = 0; o.iris = INK; o.ink = true; o.alpha = 0;
+      o.pat = (lk.pat || []).filter(function (p) { return p.t !== 'photo'; })
+        .map(function (p) { var q = {}, j; for (j in p) q[j] = p[j]; if (q.c) q.c = inked(q.c); if (q.edge) q.edge = INK; if (q.ring) q.ring = '#ffffff'; q.a = Math.min(q.a === undefined ? 1 : q.a, 0.85); return q; });
+      o.lureCol = '#ffffff'; o.glowTip = lk.glowTip ? '#ffffff' : lk.glowTip; o.skin = PAPER;
+    } else if (style === 'dark') {
+      keys.forEach(function (k2) { if (typeof o[k2] === 'string' && o[k2].charAt(0) === '#') o[k2] = shade(o[k2], -0.18); });
+      o.edge = shade(o.back, -0.45); o.shine = (lk.shine === undefined ? 0.22 : lk.shine) * 0.5;
+    }
+    return o;
+  }
+  function setStyle(s2) { style = s2 === 'pastel' || s2 === 'ink' || s2 === 'dark' ? s2 : 'real'; }
+
   function lookOf(sp) {
-    if (sp._look && sp._lookFor === sp.id) return sp._look;
+    if (sp._look !== undefined && sp._lookFor === sp.id && sp._lookStyle === style) return sp._look;
+    var lk0 = baseLook(sp);
+    sp._look = lk0 && style !== 'real' ? styled(lk0) : lk0;
+    sp._lookFor = sp.id; sp._lookStyle = style;
+    return sp._look;
+  }
+  function baseLook(sp) {
+    if (sp._base && sp._baseFor === sp.id) return sp._base;
     var id = String(sp.id || '').replace(/-pod$/, ''), own = LOOKS[id] || {};
     var base = SHAPE[sp.shape];
-    if (!base && !own.body) return (sp._look = null);
+    if (!base && !own.body) { sp._baseFor = sp.id; return (sp._base = null); }
     var lk = {}, k;
     base = base || {};
     var body = own.body || base.body || 'fish';
@@ -372,7 +415,7 @@
     lk.body = body;
     if (!lk.tailCol) lk.tailCol = lk.fin;
     lk.edge = shade(lk.back, -0.45);
-    sp._look = lk; sp._lookFor = sp.id;
+    sp._base = lk; sp._baseFor = sp.id;
     return lk;
   }
 
@@ -823,6 +866,13 @@
       return;
     }
     if (lk.eyeless) return;
+    if (lk.cartoonEye) {   // pastel look: a big white eye with a dark pupil and an outline
+      er = Math.max(1.4, er * 1.35);
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(ex, ey, er, 0, TAU); ctx.fill();
+      ctx.strokeStyle = lk.edge; ctx.lineWidth = lw * 0.7; ctx.stroke();
+      ctx.fillStyle = '#2d3a4a'; ctx.beginPath(); ctx.arc(ex + er * 0.25, ey, er * 0.55, 0, TAU); ctx.fill();
+      return;
+    }
     // the eye: iris, pupil, a highlight
     ctx.fillStyle = lk.iris || (lk.body === 'shark' ? '#101418' : '#d2b04a');
     ctx.beginPath(); ctx.arc(ex, ey, er, 0, TAU); ctx.fill();
@@ -876,8 +926,9 @@
       }
       ctx.restore();
     }
-    ctx.strokeStyle = rgba(lk.edge, 0.75);
-    ctx.lineWidth = lw * 0.7;
+    if (lk.ink && o.px > 24) inkHatch(ctx, b, lw);
+    ctx.strokeStyle = rgba(lk.edge, lk.lineA || 0.75);
+    ctx.lineWidth = lw * 0.7 * (lk.lineK || 1);
     bodyPath(ctx, b);
     ctx.stroke();
     if (lk.finlets && detail) {   // tuna and mackerel: small finlets between the second dorsal and the tail
@@ -900,6 +951,17 @@
     if (o.px > 12) pectoral(ctx, lk, b, t, ph, sw);
     head(ctx, lk, b, lw, detail);
     if (lk.body === 'angler') angler(ctx, lk, b, t, lw);
+  }
+
+  // ink look: shade the lower body with fine diagonal hatching, as a pen drawing would.
+  function inkHatch(ctx, b, lw) {
+    ctx.save();
+    bodyPath(ctx, b); ctx.clip();
+    ctx.strokeStyle = 'rgba(26,42,60,0.45)'; ctx.lineWidth = lw * 0.45; ctx.beginPath();
+    var gap = Math.max(lw * 2.2, b.H * 0.16), x;
+    for (x = -b.L * 1.2; x < b.L * 1.2; x += gap) { ctx.moveTo(x, b.H * 0.15); ctx.lineTo(x + b.H * 0.9, b.H * 1.1); }
+    ctx.stroke();
+    ctx.restore();
   }
 
   function angler(ctx, lk, b, t, lw) {   // the lure on its stalk, and a gaping mouth with needle teeth
@@ -1188,5 +1250,5 @@
     return (1.2 + Math.min(3.5, speed / 45)) / (1 + len / 260);
   }
 
-  window.FishArt = { draw: draw, beat: beat, lookOf: lookOf, LOOKS: LOOKS };
+  window.FishArt = { draw: draw, beat: beat, lookOf: lookOf, setStyle: setStyle, style: function () { return style; }, LOOKS: LOOKS };
 })();

@@ -5,6 +5,7 @@
 //   node tools/playtest.js layout     button and joystick overlap at six screen sizes
 //   node tools/playtest.js allies     ally price rises with each buy and falls back when allies die
 //   node tools/playtest.js looks      every fish has a look and draws without an error
+//   node tools/playtest.js look       Settings → Look: four looks, saved, the dark look's short radar
 //   node tools/playtest.js seafull    every level has food and predators; small fish do not bite you
 //   node tools/playtest.js smoke [s]  play for s seconds (default 20) and report page errors
 //
@@ -866,6 +867,39 @@ async function seaFull(browser, url) {
   await p.close();
 }
 
+// v0.13 Settings → Look: four looks; the choice is saved; each draws without an error; the dark look's radar is short
+// in the deep and unlimited near the surface on an early level.
+async function lookChoice(browser, url) {
+  const ctx = await startRun(browser, url, 0, 1024, 768);
+  const p = ctx.page;
+  await p.click('#gear');
+  await p.waitForTimeout(200);
+  const opts = await p.evaluate(function () { return Array.from(document.querySelectorAll('#look-select option')).map(function (o) { return o.value; }); });
+  check('Settings has a Look drop-down with four looks', opts.join(',') === 'real,pastel,ink,dark', opts.join(','));
+  await p.selectOption('#look-select', 'ink');
+  const saved = await p.evaluate(function () { return { ls: localStorage.getItem('fish_look'), look: window.FishGame.state().look }; });
+  check('choosing a look saves it and takes effect', saved.ls === 'ink' && saved.look === 'ink', JSON.stringify(saved));
+  await p.click('#panel-close').catch(function () {});
+  const shallow = [];
+  for (const look of ['real', 'pastel', 'ink', 'dark']) {
+    await p.evaluate(function (l) { localStorage.setItem('fish_look', l); }, look);
+    await p.reload(); await p.click('#btn-play'); await p.waitForTimeout(900);
+    const le = await p.evaluate(function () { return window.FishGame.loopErrors().length; });
+    shallow.push(look + ':' + le);
+  }
+  check('every look draws without an error', ctx.errors.length === 0 && shallow.every(function (x) { return x.endsWith(':0'); }), shallow.join(' ') + ' ' + ctx.errors.join(' | '));
+  const near = await p.evaluate(function () { return window.FishGame.debugRadar(); });   // dark look, level 1
+  await p.evaluate(function (g) { window.FishGame.debugSetSize(g); }, GAME_DATA.GOALS[13] + 0.5);   // level 15
+  await p.waitForTimeout(5800);
+  const deep = await p.evaluate(function () { const s = window.FishGame.state(); window.FishGame.debugMove(s.px, window.FishGame.bedAt(s.px) - 60); return 0; });
+  await p.waitForTimeout(400);
+  const far = await p.evaluate(function () { return { radar: window.FishGame.debugRadar(), W: window.FishGame.state().W }; });
+  check('dark look: the radar sees the whole sea on level 1, and only nearby by the seabed on level 15',
+    near === -1 && far.radar > 0 && far.radar < far.W / 3, 'level 1 radar ' + near + ', level 15 by the seabed ' + Math.round(far.radar) + ' of a sea ' + far.W + ' wide' + deep);
+  await p.evaluate(function () { localStorage.removeItem('fish_look'); });
+  await p.close();
+}
+
 async function smoke(browser, url, seconds) {
   const ctx = await startRun(browser, url, 12, 1024, 768, 'joystick');
   for (let i = 0; i < 3; i++) { await ctx.page.click('#ally'); await ctx.page.waitForTimeout(100); }
@@ -908,9 +942,10 @@ async function smoke(browser, url, seconds) {
     if (which === 'all' || which === 'buttons') await buttonsAndMap(browser, url);
     if (which === 'all' || which === 'smooth') await smoothness(browser, url);
     if (which === 'all' || which === 'looks') await looks(browser, url);
+    if (which === 'all' || which === 'look') await lookChoice(browser, url);
     if (which === 'all' || which === 'seafull') await seaFull(browser, url);
     if (which === 'all' || which === 'smoke') await smoke(browser, url, which === 'smoke' ? secs : 10);
-    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'notes', 'growth', 'schoolcap', 'buttons', 'smooth', 'looks', 'seafull', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
+    if (!['all', 'layout', 'allies', 'fights', 'camera', 'density', 'life', 'creatures', 'pacing', 'allystay', 'settings', 'calm', 'calmlevels', 'schoolforms', 'harmless', 'background', 'friends', 'edible', 'evolution', 'notes', 'growth', 'schoolcap', 'buttons', 'smooth', 'looks', 'look', 'seafull', 'smoke'].includes(which)) { console.log('unknown check: ' + which); process.exitCode = 2; }
   } catch (e) {
     check('harness error', false, e.message.split('\n')[0]);
   } finally {

@@ -416,13 +416,13 @@
 
   // Depth zones: the sea gets deeper, bigger and darker tier by tier.
   var ZONES = [
-    // v0.13: real sea colours. top: the water just under the surface; bottom: at the seabed. light: sun rays and
+    // v0.13: real sea colours (pastel: the soft colours of 0.12 and before, for Settings → Look → Pastel). top: the water just under the surface; bottom: at the seabed. light: sun rays and
     // ripples of light on the sand (0 = none). kelp: what grows on the bottom. reef: what else lies on it.
-    { name: 'Sunny Shallows', top: '#78d6dc', bottom: '#2a9ab4', sand: '#e2cc98', light: 1, kelp: 'grass', reef: 'shallow', rays: true },
-    { name: 'Coral Reef', top: '#5ccae0', bottom: '#1a7eb0', sand: '#ead8b8', light: 0.9, kelp: 'grass', reef: 'coral', rays: true },
-    { name: 'Open Blue', top: '#3aa0da', bottom: '#0c4c92', sand: '#8e9eaa', light: 0.55, kelp: 'kelp', reef: 'open', rays: true },
-    { name: 'Twilight', top: '#1d5a96', bottom: '#09224c', sand: '#46526a', light: 0.15, kelp: 'none', reef: 'twilight', rays: false },
-    { name: 'Deep Trench', top: '#103664', bottom: '#030b20', sand: '#20283a', light: 0, kelp: 'none', reef: 'trench', rays: false }
+    { name: 'Sunny Shallows', pastel: { top: '#dff8f1', bottom: '#b8ead8', sand: '#f7e6bf' }, top: '#78d6dc', bottom: '#2a9ab4', sand: '#e2cc98', light: 1, kelp: 'grass', reef: 'shallow', rays: true },
+    { name: 'Coral Reef', pastel: { top: '#d6f3f7', bottom: '#a9e1ec', sand: '#f4dcc8' }, top: '#5ccae0', bottom: '#1a7eb0', sand: '#ead8b8', light: 0.9, kelp: 'grass', reef: 'coral', rays: true },
+    { name: 'Open Blue', pastel: { top: '#c6e4fb', bottom: '#8fc3ec', sand: '#d9e7f3' }, top: '#3aa0da', bottom: '#0c4c92', sand: '#8e9eaa', light: 0.55, kelp: 'kelp', reef: 'open', rays: true },
+    { name: 'Twilight', pastel: { top: '#c9c8f0', bottom: '#8d8fd0', sand: '#b9b6dc' }, top: '#1d5a96', bottom: '#09224c', sand: '#46526a', light: 0.15, kelp: 'none', reef: 'twilight', rays: false },
+    { name: 'Deep Trench', pastel: { top: '#6f73b5', bottom: '#333b74', sand: '#2a3163' }, top: '#103664', bottom: '#030b20', sand: '#20283a', light: 0, kelp: 'none', reef: 'trench', rays: false }
   ];
 
   var LEVEL_NAMES = [
@@ -504,7 +504,7 @@
     VERSION_DATE: '2026-11-07',
     // Build stamp: changes on every merge, with the ?b= on the script and style links in index.html. It shows on the title
     // screen and in Settings, so a device running an old cached copy can be told apart from the current build.
-    BUILD: '2026-11-21.1',
+    BUILD: '2026-11-21.2',
     TIME_LIMIT: 900,                    // hard stop at 15 minutes
     LIVES: 3,
     TENSION: { start: 150, full: 300 }, // harder from 2:30, full by 5:00 (raises the predator share by up to 50%)
