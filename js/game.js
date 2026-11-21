@@ -711,6 +711,15 @@
       (evolved ? 'Level ' + n + ': ' + r.info.name + '. ' + lead.name + ': ' + say + '. ' : '') + 'Goal: size ' + Math.round(r.info.goal), 3200);
   }
 
+  // v0.13: a wild fish's size in play. The species list keeps the old sizes (whale shark 100), but since v0.10 you start
+  // at 3 and the goals run to 300, so fish are scaled by TUNE.fishScale (3). Without it nothing in the sea was big
+  // enough to eat or to fear from level 13 on (measured: 0 edible fish and 0 threats at levels 14 and 18).
+  // Food, the creatures and the background items are placed by level, not by size, and keep their sizes.
+  function spSize(sp) {
+    if (sp.kind === 'food' || sp.trash || sp.bg || sp.id === 'turtle' || sp.id === 'crab' || sp.id === 'moon') return sp.size;
+    return sp.size * TUNE.fishScale;
+  }
+
   function spawnNPC(sp, initial) {
     var r = run, W = r.info.W, H = r.info.H, x = 0, y = 0, tries = 0;
     if (r.arriving) {
@@ -726,11 +735,11 @@
     }
     r.npcs.push({
       sp: sp, x: x, y: y, vx: 0, vy: 0,
-      size: sp.kind === 'food' ? sp.size : sp.size * rand(0.9, 1.12),
+      size: sp.kind === 'food' ? sp.size : spSize(sp) * rand(0.9, 1.12),
       spd: rand(0.9, 1.1), facing: Math.random() < 0.5 ? 1 : -1,
       t: rand(0, 6), anchor: { x: x, y: y }, tgt: null, tT: 0,
       cool: rand(0, 2), lunge: 0, lx: 0, ly: 0, locked: false, lockT: 0, dead: false,
-      hp: maxHpOf(sp.size), maxHp: maxHpOf(sp.size), biteT: 0,
+      hp: maxHpOf(spSize(sp)), maxHp: maxHpOf(spSize(sp)), biteT: 0,
       arrive: r.arriving ? 6 : 0
     });
     // Kelp: plankton and small fish gather round a patch, ambush fish patrol one (the loop).
@@ -753,16 +762,18 @@
   // Hit points are doubled (v0.8). Fish of size 4 or more take several bites (4 to 10); smaller fish go in two or more.
   // From level 10 on, fish have twice the hit points again (v0.9): several bites to take down a prey.
   function maxHpOf(size) {
-    var late = run && run.info.n >= 10 ? 2 : 1;
+    var late = run && run.info.n >= 10 ? TUNE.lateHp : 1;
     return late * 2 * (size >= 4 ? Math.max(2, Math.round(size / 2)) : Math.max(1, Math.round(size / 3)));
   }
   function atkOf(size) { return 1 + Math.floor(size / 8); }
   function playerMaxHp(size) { return TUNE.playerHp * (10 + Math.floor(size / 2)); }
+  var CHUM_CAP = 200;
   var CHUM = { id: 'chum', name: 'Chum', kind: 'food', temper: 'docile', shape: 'plankton', size: 0.6, speed: 20, col: '#ffb4a2' };
 
   // A fish of size 4 or more leaves chum behind when it dies. Chum draws small fish in to feed and school.
   function dropChum(n) {
     if (n.sp.kind === 'food' || n.size < 4) return;
+    if ((run.chumN || 0) >= CHUM_CAP) return;   // v0.13: the sea holds at most CHUM_CAP bits (it reached thousands later on)
     var count = Math.min(12, Math.max(1, Math.round(n.size / 4)));   // bits: about a quarter of its size, in pieces
     for (var i = 0; i < count; i++) {
       run.npcs.push({
@@ -1099,13 +1110,26 @@
     var bg = bgOn();
     var fits = function (sp) {
       if (sp.kind === 'food' || sp.bg) return false;   // v0.12: background items are placed by fillCreatures, by level
-      if (role === 'threat') return canHurt(sp) && sp.size >= P * 1.15 && sp.size <= P * 1.9;
-      if (role === 'harmless') return sp.kind === 'harmless' && sp.size <= P * 1.6;
-      return sp.kind !== 'harmless' && sp.size >= P * 0.25 && sp.size <= P * 0.85;
+      var z = spSize(sp);
+      // v0.13: species are matched with room to spare (a fish's size varies 0.9-1.12x), then fitRole sizes the new fish
+      // into its role's band. Above level 10 you eat only fish 80-87% of your size, a band so narrow that no species
+      // fitted it exactly, and the sea stayed empty (measured at levels 11 and 14).
+      if (role === 'threat') return canHurt(sp) && z >= P * 1.15 / 1.12 && z <= P * 1.9;
+      if (role === 'harmless') return sp.kind === 'harmless' && z <= P * 1.6;
+      return sp.kind !== 'harmless' && z >= P * Math.max(0.25, edibleMin()) / 1.12 && z <= P * 0.85 / 0.9;
     };
     var pool = SPECIES.filter(function (sp) { return fits(sp) && inTiers(sp); });
     if (!pool.length) pool = SPECIES.filter(fits);
     return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+  }
+
+  // v0.13: a new fish is sized into the band of the role it was picked for (edible: what you can eat now; threat: big
+  // enough to hunt you), so the predator:prey ratio the difficulty asks for is what you meet.
+  function fitRole(o, role, P) {
+    var z = o.size;
+    if (role === 'edible') z = clamp(z, P * (Math.max(0.25, edibleMin()) + 0.01), P * 0.86);
+    else if (role === 'threat') z = clamp(z, P * 1.15, P * 1.9);
+    if (z !== o.size) { o.size = z; o.hp = o.maxHp = maxHpOf(z); }
   }
 
   function pickRole(c) {
@@ -1175,13 +1199,28 @@
     r.npcs.forEach(function (o) { if (!o.dead) counts[o.sp.id] = (counts[o.sp.id] || 0) + 1; });
     SPECIES.forEach(function (sp) {
       if (sp.kind !== 'food' || sp.tier > n) return;
-      var target = Math.round(sp.base * (1 + 0.05 * (n - 1)) * dense);
+      // v0.13: after level 4 you no longer eat plankton, so a third as much drifts about (it is there for the fish).
+      var target = Math.round(sp.base * (1 + 0.05 * (n - 1)) * dense * (n <= FOOD_LAST_LEVEL ? 1 : 1 / 3));
       var add = Math.min(target - (counts[sp.id] || 0), initial ? target : 4 * dense);
       for (i = 0; i < add; i++) spawnNPC(sp, initial);
     });
+    // v0.13: fish far from you that are now too small for you to eat swim off (a few each refill), so the sea makes room
+    // for fish of your size. Without it the levels where the eating floor rises (5 and 11) kept the last level's small
+    // fish, the sea stayed full, and nothing new came (measured: level 5 took 3-5 minutes).
+    if (!initial) {
+      var floor = Math.max(0.25, edibleMin()) * r.size, far = 8 * lenFor(r.size, 'round'), gone = 0, keepN = 3 * dense;
+      for (i = 0; i < r.npcs.length && gone < keepN; i++) {
+        var o = r.npcs[i];
+        if (o.dead || o.pod || o.ally || o.sp.kind === 'food' || o.sp.kind === 'harmless' || o.sp.bg || o.size >= floor) continue;
+        if (distW(o, r) > far) { o.dead = true; gone++; }
+      }
+    }
     // Fish: a tier-sized population, split into threats and edible fish by the ratio.
     var c = census();
-    var need = Math.round((TUNE.fishBase + TUNE.fishPerLevel * n) * dense) - c.fish;
+    // v0.13: a harder setting adds predators on top of the same food, rather than swapping food for predators (Hard was
+    // slower than Medium but less deadly in tools/balance.js). The sea holds as many edible fish as Medium's.
+    var more = Math.max(1, (1 - D.DIFFICULTY.medium.share) / (1 - threatShare()));
+    var need = Math.round((TUNE.fishBase + TUNE.fishPerLevel * n) * dense * more) - c.fish;
     var budget = initial ? 999 : 2 * dense;
     while (need > 0 && budget > 0) {
       var role = pickRole(c), actual = role;
@@ -1190,6 +1229,7 @@
       if (!sp) break;
       spawnNPC(sp, initial);
       var lead = r.npcs[r.npcs.length - 1], made = 1;
+      fitRole(lead, actual, r.size);
       if (sp.kind === 'hunter' && Math.random() < 0.6) {   // hunters often come in packs of 2 to 3 (v0.9)
         var pk = ++r.packSeq, extra = 1 + Math.floor(Math.random() * 2), pi;
         lead.pack = pk;
@@ -1201,6 +1241,7 @@
           mate.anchor = { x: mate.x, y: mate.y };
           mate.arrive = lead.arrive;
           mate.pack = pk;
+          fitRole(mate, actual, r.size);
           made++;
         }
       }
@@ -1227,7 +1268,7 @@
     r.maxHp = Math.round(playerMaxHp(r.size) * (r.form.hp || 1));   // v0.12: your form's health
     r.hp = Math.min(r.hp, r.maxHp);
     r.quietT = (r.quietT || 0) + dt;
-    if (r.quietT > 4 && r.hp < r.maxHp) r.hp = Math.min(r.maxHp, r.hp + TUNE.regen * dt);
+    if (r.quietT > 4 && r.hp < r.maxHp) r.hp = Math.min(r.maxHp, r.hp + Math.max(3, TUNE.regen * r.maxHp) * dt);
     if (control === 'joystick' && Math.hypot(joy.dx, joy.dy) > 0.15) {
       dx = joy.dx; dy = joy.dy;
       var jm = Math.hypot(dx, dy);
@@ -1308,7 +1349,7 @@
     return best;
   }
 
-  function updateNPC(n, dt, predators) {
+  function updateNPC(n, dt) {
     var sp = n.sp, r = run;
     if (n.pod) { updatePodMember(n, dt); return; }
     n.biteT = Math.max(0, (n.biteT || 0) - dt);
@@ -1576,7 +1617,7 @@
     if (r.biteT <= 0 && n.size >= r.size * edibleMin()) {   // v0.12: you do not bite fish under half your size
       r.biteT = BITE_S;
       r.lastBit = n;   // v0.11: the target your allies join when you use Attack
-      n.hp -= Math.max(1, Math.round(atkOf(r.size) * (r.form.atk || 1)));   // v0.12: your form's bite
+      n.hp -= Math.max(1, Math.round(atkOf(r.size) * TUNE.playerBite * (r.form.atk || 1)));   // v0.12: your form's bite; v0.13 x playerBite
       styleLvl().bite++;
       burst(n.x, n.y, '#d9473a', 5);
       schoolDefend(n, null);
@@ -1642,13 +1683,12 @@
     // v0.12: no new fish swim in during the calm; the sea you have settles first.
     if (r.spawnT <= 0) { r.spawnT = 1.2; if (r.calmT <= 0) fillPopulations(false); }
 
-    var predators = r.npcs.filter(function (o) {
-      return !o.dead && (o.sp.kind === 'hunter' || o.sp.kind === 'ambush');
-    });
     var i;
+    r.chumN = 0;
+    for (i = 0; i < r.npcs.length; i++) if (r.npcs[i].sp === CHUM && !r.npcs[i].dead) r.chumN++;
     buildGrid();   // v0.12: for the searches in updateNPC
     for (i = 0; i < r.npcs.length; i++) {
-      if (!r.npcs[i].dead) updateNPC(r.npcs[i], dt, predators);
+      if (!r.npcs[i].dead) updateNPC(r.npcs[i], dt);
     }
     // Ally meals add to your size (v0.10). v0.12: growth past the goal waits for the calm to end, then one level.
     if (r.growPending || r.size >= r.goal) { r.growPending = false; checkGrowth(); }
@@ -2496,6 +2536,7 @@
   // Test hook (used by the headless checks): jump to a size and apply the level rules.
   // Test hook (v0.10): a fish of the given size placed beside you, to check fights. The last one is read back by state().
   var testFish = null, testCreature = null;
+  var uidSeq = 0;
   window.FishGame = {
     resize: resize,
     // v0.13 balance hooks (tools/balance.js). debugSim(true) stops the page loop; debugStep advances the game by
@@ -2521,7 +2562,8 @@
           : sp.kind !== 'harmless' && !sp.sting && sp.id !== own && o.size >= P * edibleMin() && o.size <= P * 0.87;
         // What can bite you: any fish that can bite does (fights, v0.10); a threat can also hunt or lock on.
         var danger = (canBite(sp) && sp.id !== own && atkOf(o.size) >= 2 && o.size > P * 0.9) || isThreat(o, P) || o.locked;
-        out.push({ dx: dx, dy: dy, size: o.size, edible: edible, food: food, gain: edible && !sp.spiky ? mealGain(o) : 0, hp: o.hp, danger: danger, sting: !!sp.sting, locked: !!o.locked,
+        if (!o.uid) o.uid = ++uidSeq;   // a stable name, so the bot can stay on one target
+        out.push({ id: o.uid, dx: dx, dy: dy, size: o.size, edible: edible, food: food, gain: edible && !sp.spiky ? mealGain(o) : 0, hp: o.hp, danger: danger, sting: !!sp.sting, locked: !!o.locked,
           spiky: !!sp.spiky, len: lenFor(o.size, sp.shape) });
       });
       return { t: r.t, level: r.info.n, size: P, y: r.y, bed: bedY(r.x), goal: r.goal, hp: r.hp, maxHp: r.maxHp, stamina: r.stamina, lives: r.lives,

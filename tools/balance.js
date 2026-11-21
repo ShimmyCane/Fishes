@@ -5,6 +5,7 @@
 //   node tools/balance.js --runs 8 --diff easy,medium,hard --skill novice,average,expert
 //   node tools/balance.js --tune mealDiv=11,lockRate=0.3   try tuning values (see TUNING in js/species.js)
 //   node tools/balance.js --json out.json        also write every run as JSON
+//   node tools/balance.js --start 5 --minutes 6   begin at level 5 (quick look at the middle game)
 //   node tools/balance.js --minutes 16           stop a run after this many game minutes (endless play after level 20)
 //
 // The game runs in real Chromium with its own rules; only the page's frame loop is paused, and the bot advances it
@@ -23,7 +24,7 @@ const { gameData, loadPlaywright, serve, launch } = require('./harness');
 
 // ---------- options ----------
 function parseArgs(argv) {
-  const o = { runs: 4, diff: ['medium', 'hard'], skill: ['average'], tune: {}, json: null, minutes: 16, workers: 3, quiet: false };
+  const o = { start: 1, runs: 4, diff: ['medium', 'hard'], skill: ['average'], tune: {}, json: null, minutes: 16, workers: 3, quiet: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], v = argv[i + 1];
     if (a === '--runs') { o.runs = Number(v); i++; }
@@ -32,6 +33,7 @@ function parseArgs(argv) {
     else if (a === '--json') { o.json = v; i++; }
     else if (a === '--minutes') { o.minutes = Number(v); i++; }
     else if (a === '--workers') { o.workers = Number(v); i++; }
+    else if (a === '--start') { o.start = Number(v); i++; }
     else if (a === '--quiet') { o.quiet = true; }
     else if (a === '--tune') {
       v.split(',').forEach(function (kv) { const p = kv.split('='); o.tune[p[0]] = Number(p[1]); });
@@ -46,8 +48,8 @@ function parseArgs(argv) {
 // noise: aim error in radians. sprintFlee / sprintChase: whether it sprints to escape or to catch food.
 const SKILLS = {
   novice:  { reaction: 0.35, sightLens: 4.5, fleeLens: 2.0, noise: 0.45, sprintFlee: false, sprintChase: false, avoidSpiky: false },
-  average: { reaction: 0.2,  sightLens: 6,   fleeLens: 3.0, noise: 0.2,  sprintFlee: true,  sprintChase: false, avoidSpiky: true },
-  expert:  { reaction: 0.1,  sightLens: 7,   fleeLens: 4.0, noise: 0.05, sprintFlee: true,  sprintChase: true,  avoidSpiky: true }
+  average: { reaction: 0.2,  sightLens: 6,   fleeLens: 3.0, noise: 0.2,  sprintFlee: true,  sprintChase: true,  avoidSpiky: true },
+  expert:  { reaction: 0.1,  sightLens: 7,   fleeLens: 2.6, noise: 0.05, sprintFlee: true,  sprintChase: true,  avoidSpiky: true }
 };
 
 // ---------- the bot (runs inside the page) ----------
@@ -74,10 +76,12 @@ function botChunk(args) {
         }
       }
       if (o.edible && !(cfg.avoidSpiky && o.spiky)) {
-        const score = o.gain / (d + L) / (o.food ? 1 : 1 + 0.15 * o.hp);   // growth per distance, and per bite it takes
+        let score = o.gain / (d + L) / (o.food ? 1 : 1 + 0.15 * o.hp);   // growth per distance, and per bite it takes
+        if (o.id === b.target) score *= 3;   // stay on the fish you are already chasing, as a person does
         if (score > bestScore) { bestScore = score; best = o; }
       }
     });
+    b.target = best ? best.id : null;
     // Keep off the surface (a hop wastes time) and the seabed.
     if (s.y < 120) fy += 0.6;
     if (s.bed - s.y < 90) fy -= 0.6;
@@ -115,7 +119,11 @@ async function playRun(browser, url, diff, skill, opts) {
   page.on('pageerror', function (e) { errors.push(e.message); });
   if (Object.keys(opts.tune).length) await page.addInitScript(function (t) { window.FishTuning = t; }, opts.tune);
   await page.goto(url);
-  await page.evaluate(function (d) { window.FishGame.debugSim(true); window.FishGame.debugNewRun(d); }, diff);
+  await page.evaluate(function (a) {
+    const G = window.FishGame;
+    G.debugSim(true); G.debugNewRun(a.diff);
+    if (a.start > 1) G.debugSetSize(a.goal + 0.01);   // begin at a later level (levelAt then counts from there)
+  }, { diff: diff, start: opts.start, goal: opts.start > 1 ? gameData(opts.tune).GOALS[opts.start - 2] : 0 });
   let ms = 0, steps = 0, st = null;
   const cap = opts.minutes * 60;
   for (;;) {
@@ -128,7 +136,7 @@ async function playRun(browser, url, diff, skill, opts) {
   return {
     diff: diff, skill: skill, end: st.mode === 'play' ? (st.level >= 20 ? 'reached 20' : 'cap') : st.end,
     t: Math.round(st.t), level: st.level, size: +st.size.toFixed(1), lives: st.lives, score: st.score,
-    levelAt: st.stats.levelAt, deaths: st.stats.deaths, dmg: Math.round(st.stats.dmg), dmgBy: st.stats.dmgBy,
+    levelAt: st.stats.levelAt.map(function (v, i) { return i < opts.start - 1 ? null : v; }), deaths: st.stats.deaths, dmg: Math.round(st.stats.dmg), dmgBy: st.stats.dmgBy,
     food: st.stats.food, fish: st.stats.fish, path: st.path, msPerStep: +(ms / steps).toFixed(3), errors: errors
   };
 }
@@ -170,7 +178,7 @@ function report(runs, D, opts) {
   keys.forEach(function (k) {
     perLevel[k] = [];
     for (let n = 1; n < 20; n++) {
-      const v = groups[k].filter(function (r) { return r.levelAt[n] !== undefined && r.levelAt[n] !== null; })
+      const v = groups[k].filter(function (r) { return r.levelAt[n] != null && r.levelAt[n - 1] != null; })
         .map(function (r) { return r.levelAt[n] - r.levelAt[n - 1]; });
       perLevel[k].push(median(v));
     }

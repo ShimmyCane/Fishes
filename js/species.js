@@ -436,13 +436,13 @@
 
   // Size needed to leave each tier, before scaling (tier 20 = 100 = the largest fish ever, at START_SIZE 1).
   // v0.11 pacing. SPAN_BASE is each level's size gain as it was (sizes 3 to 300 over 20 levels).
-  // Levels 1-5 need three times that much growth (more food before you move on); later levels need 13% less,
-  // so the largest fish is still about 300. Each meal still gives the same growth as before (levelInfo.meal).
+  // Levels 1-4 need three times that much growth (more food before you move on); later levels need 8.5% less,
+  // so the largest fish is still about 300. (v0.13: level 5 was also tripled, and it took 2-5 minutes in tools/balance.js.) Each meal still gives the same growth as before (levelInfo.meal).
   var SPAN_BASE = [3, 3, 3, 3, 6, 6, 6, 9, 9, 12, 12, 15, 18, 21, 21, 24, 27, 30, 33, 36];
   var GOALS = (function () {
     var out = [], g = START_SIZE, i;
     for (i = 0; i < SPAN_BASE.length; i++) {
-      g += SPAN_BASE[i] * (i < 5 ? 3 : 0.87);
+      g += SPAN_BASE[i] * (i < 4 ? 3 : 0.915);   // v0.13: levels 1-4 (the plankton levels); level 5 took 2-5 minutes at 3x
       out.push(g);
     }
     return out;
@@ -520,12 +520,16 @@
     sprint: 2.1,           // sprint multiplies your speed by this
     biteS: 1.0,            // seconds between your bites
     strikeS: 0.9,          // seconds between a fish's bites
-    playerHp: 2,           // your health = this x (10 + size / 2), times your form's health
-    regen: 3,              // health a second you regain after 4 seconds without a hit
-    mealDiv: 9,            // a fish meal gives at least 1/mealDiv of the level's span (so about mealDiv meals a level)
-    mealDivMid: 12,        // the same for levels 8-10 (family note 2026-11-08)
-    mealDivTop: 10,        // the same for level 20
-    mealMin: 5,            // v0.13: a fish meal gives at most 1/mealMin of the level's span, so a level is never one or two meals
+    playerHp: 2.6,         // your health = this x (10 + size / 2), times your form's health (v0.13: was 2)
+    regen: 0.08,           // share of your max health a second you regain after 4 seconds without a hit (v0.13: was a flat 3,
+                           // 14% a second at level 1 but under 2% at level 15, so late fights piled up)
+    mealDiv: 5,            // a fish meal gives at least 1/mealDiv of the level's span (so at most mealDiv meals a level; v0.13: was 9)
+    mealDivMid: 7,         // the same for levels 8-10 (family note 2026-11-08: a little slower there; v0.13: was 12)
+    mealDivTop: 6,         // the same for level 20 (v0.13: was 10)
+    mealMin: 3,            // v0.13: a fish meal gives at most 1/mealMin of the level's span, so a level is never one or two meals
+    playerBite: 2,         // v0.13: your bite does this x your attack (prey of your level take about 3-5 bites, not 8-16)
+    lateHp: 1,             // from level 10, fish have this x the health (v0.13: was 2; with playerBite 2 every late meal was an even fight)
+    fishScale: 3,          // v0.13: wild fish are this x their listed size (= START_SIZE, as the level goals are); see spSize in game.js
     nibbleMin: 0.5,        // v0.13: a fish under this share of your size does not bite you (it is too small to take you on)
     fishBase: 22,          // wild fish in the sea: (fishBase + fishPerLevel x level) x 12 on the denser sea
     fishPerLevel: 3,
